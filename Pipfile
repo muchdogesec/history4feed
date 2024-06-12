@@ -1,0 +1,23 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+readability-lxml = "*"
+python-dateutil = "*"
+brotlipy = "*"
+python-dotenv = "*"
+djangorestframework = "*"
+drf-spectacular = "*"
+lxml_html_clean = "*"
+celery = "*"
+redis = "*"
+psycopg2-binary = "*"
+gunicorn = "*"
+django-filter = "*"
+requests = "*"
+fake-useragent = "==1.5.1"
+
+[dev-packages]
+autopep8 = "*"

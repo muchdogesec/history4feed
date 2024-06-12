@@ -1,0 +1,54 @@
+version: "3.8"
+   
+services:
+    django:
+        build: .
+        container_name: h4f_django
+        command: >
+                bash -c "python manage.py makemigrations &&
+                            python manage.py migrate &&
+                            gunicorn history4feed.wsgi:application --bind 0.0.0.0:8000"
+        volumes:
+            - .:/usr/src/app/
+        ports:
+            - 8000:8000
+        environment:
+            - DEBUG=1
+            - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
+            - CELERY_BROKER_URL=redis://redis:6379/0
+        env_file:
+            - ./.env
+        depends_on:
+            - pgdb
+            - redis
+    celery:
+        build: .
+        command: >
+                bash -c "
+                  celery -A history4feed.h4fscripts worker -l INFO
+                  "
+        volumes:
+            - .:/usr/src/app
+        environment:
+            - DEBUG=1
+            - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
+            - CELERY_BROKER_URL=redis://redis:6379/0
+            - result_backend=redis://redis:6379/1
+        env_file:
+            - ./.env
+        depends_on:
+            - django
+            - redis
+    pgdb:
+        image: postgres
+        container_name: h4f_pgdb
+        env_file:
+          - ./.env
+
+        volumes:
+            - pgdata:/var/lib/postgresql/data/
+    redis:
+        image: "redis:alpine"
+        
+volumes:
+    pgdata:
