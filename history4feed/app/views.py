@@ -104,7 +104,7 @@ class FeedView(viewsets.ModelViewSet):
         return Feed.objects.all().annotate(count_of_posts=Count("posts"))
 
     @extend_schema(summary="Create a new Feed", description=textwrap.dedent("""
-        Use this endpoint to create to a new feed. The `url` value used should be a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned. Generally you should set `retrieve_full_text` to `true`. If you are certain the blog you are subscribing to has a full text feed already, you can safely set this to `false`.
+        Use this endpoint to create to a new feed. The `url` value used should be a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned. Generally you should set `retrieve_full_text` to `true`. If you are certain the blog you are subscribing to has a full text feed already, you can safely set this to `false`. If `url` is already associated with an existing Feed, using it via this endpoint will trigger an update request for the blog. If you want to add the `url` with new settings, first delete it.
         """), tags=open_api_tags)
     def create(self, request: request.Request, **kwargs):
         s = self.serializer_class(data=request.data)
