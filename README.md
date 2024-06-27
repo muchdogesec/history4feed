@@ -17,6 +17,10 @@ history4feed offers an API interface that;
 5. stores the post record in the databases
 6. exposes the posts as JSON or XML RSS
 
+## tl;dr
+
+[![history4feed](https://img.youtube.com/vi/z1ATbiecbg4/0.jpg)](https://www.youtube.com/watch?v=z1ATbiecbg4)
+
 ## Install
 
 ### Download and configure
