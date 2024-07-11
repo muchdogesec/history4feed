@@ -106,4 +106,4 @@ Note, if you intend on using this in production, you should also modify the vari
 
 ## License
 
-[Apache 2.0](/LICENSE).
+[AGPLv3](/LICENSE).
