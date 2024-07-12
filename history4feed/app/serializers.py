@@ -13,7 +13,7 @@ class FeedSerializer(serializers.ModelSerializer):
 class PostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
-        exclude = ['feed']
+        exclude = ['feed', 'job']
         # fields = '__all__'
 
 class JobSerializer(serializers.ModelSerializer):

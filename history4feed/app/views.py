@@ -51,6 +51,7 @@ class PostView(
     class filterset_class(FilterSet):
         title = Filter(label="Filter by the content in a posts title. Will search for titles that contain the value entered.", lookup_expr='search')
         description = Filter(label="Filter by the content in a posts description. Will search for descriptions that contain the value entered.", lookup_expr='search')
+        job_id = Filter(label="Filter by job id")
 
     def get_queryset(self):
         queryset = Post.objects.filter(
@@ -190,4 +191,3 @@ class JobView(
         """), tags=open_api_tags)
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
-    

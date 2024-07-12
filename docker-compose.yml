@@ -1,26 +1,29 @@
 version: "3.8"
    
 services:
-    django:
+    h4f_django:
         build: .
-        container_name: h4f_django
         command: >
-                bash -c "python manage.py makemigrations &&
+                bash -c "
+                    python manage.py makemigrations &&
                             python manage.py migrate &&
-                            gunicorn history4feed.wsgi:application --bind 0.0.0.0:8000"
+                            gunicorn history4feed.wsgi:application --bind 0.0.0.0:8000
+                        "
         volumes:
             - .:/usr/src/app/
         ports:
             - 8000:8000
         environment:
             - DEBUG=1
-            - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
+            - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1] h4f_django
             - CELERY_BROKER_URL=redis://redis:6379/0
         env_file:
             - ./.env
         depends_on:
-            - pgdb
-            - redis
+            pgdb:
+                condition: service_healthy
+            redis:
+                condition: service_started
     celery:
         build: .
         command: >
@@ -37,16 +40,21 @@ services:
         env_file:
             - ./.env
         depends_on:
-            - django
+            - h4f_django
             - redis
     pgdb:
         image: postgres
-        container_name: h4f_pgdb
         env_file:
           - ./.env
 
         volumes:
             - pgdata:/var/lib/postgresql/data/
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+            interval: 10s
+            retries: 5
+            start_period: 30s
+            timeout: 10s
     redis:
         image: "redis:alpine"
         

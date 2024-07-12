@@ -84,7 +84,7 @@ class H4FOrdering(OrderingFilter):
                 'description': force_str(self.ordering_description),
                 'schema': {
                     'type': 'string',
-                    'enum': self.get_ordering_mapping(None, view).keys()
+                    'enum': list(self.get_ordering_mapping(None, view).keys())
                 },
             },
         ]

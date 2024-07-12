@@ -42,7 +42,7 @@ def retrieve_posts_from_link(job_id, urls):
     chains = []
     parsed_feed = {}
     for index, url in enumerate(urls):
-        parsed_feed, posts, error = retrieve_posts_from_url(url, feed)
+        parsed_feed, posts, error = retrieve_posts_from_url(url, feed, job_id)
         if error:
             continue
         if not posts:
@@ -66,7 +66,7 @@ def collect_and_schedule_removal(sender, job_id):
     job.state = models.JobState.SUCCESS
     job.save()
 
-def retrieve_posts_from_url(url, db_feed: models.Feed):
+def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
     back_off_seconds = settings.WAYBACK_SLEEP_SECONDS
     all_posts = []
     error = None
@@ -86,7 +86,7 @@ def retrieve_posts_from_url(url, db_feed: models.Feed):
             for post_dict in posts.values():
                 categories = post_dict.categories
                 del post_dict.categories
-                post, created = models.Post.objects.get_or_create(defaults=post_dict.__dict__, feed=db_feed, link=post_dict.link)
+                post, created = models.Post.objects.get_or_create(defaults=post_dict.__dict__, feed=db_feed, link=post_dict.link, job_id=job_id)
                 if not created:
                     continue
                 db_feed.earliest_item_pubdate = min(db_feed.earliest_item_pubdate or post.pubdate, post.pubdate)
