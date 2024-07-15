@@ -1,13 +1,15 @@
 from django.shortcuts import get_object_or_404
 
-from .openapi_params import JOB_ID_PARAM, FEED_ID_PARAM,  POST_ID_PARAM
-from .utils import H4FOrdering, H4FPagination, MinMaxDateFilter
+from .autoschema import H4FSchema
+
+from .openapi_params import JOB_ID_PARAM, FEED_ID_PARAM,  POST_ID_PARAM, XML_RESPONSE
+from .utils import H4FOrdering, H4FPagination, MinMaxDateFilter, RSSRenderer, XMLPostPagination
 
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
 from .serializers import PostSerializer, FeedSerializer, JobSerializer
 from .models import Post, Feed, Job
-from rest_framework import viewsets, request, response, mixins, decorators
+from rest_framework import viewsets, request, response, mixins, decorators, renderers, pagination
 from django.http import HttpResponse
 from ..h4fscripts import h4f, task_helper, build_rss
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -54,21 +56,20 @@ class PostView(
         job_id = Filter(label="Filter by job id")
 
     def get_queryset(self):
-        queryset = Post.objects.filter(
-            Q(pubdate__lte=self.request.query_params.get("pubdate_max", datetime.max)) & Q(pubdate__gte=self.request.query_params.get("pubdate_min", datetime.min)),
+        return Post.objects.filter(
             feed_id=self.kwargs.get("feed_id")
         )
-        return queryset
 
     @extend_schema(parameters=[FEED_ID_PARAM], filters=True, summary="Search for Posts in a Feed (RSS)", description=textwrap.dedent("""
         Use this endpoint with your feed reader. The response of this endpoint is valid RSS XML for the Posts in the Feed. If you want more flexibility (perhaps to build a custom integration) use the JSON version of this endpoint.
-        """), tags=open_api_tags)
-    @decorators.action(methods=["get"], detail=False)
+        """), tags=open_api_tags, responses=XML_RESPONSE)
+    @decorators.action(methods=["get"], detail=False, pagination_class=XMLPostPagination("xml_posts"), renderer_classes=[RSSRenderer])
     def xml(self, request: request.Request, *args, feed_id=None, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
         feed_obj = get_object_or_404(Feed, id=feed_id)
-        body = build_rss.build_rss(feed_obj, queryset)
-        return HttpResponse(body, content_type="application/rss+xml; charset=UTF-8")
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        body = build_rss.build_rss(feed_obj, page)
+        return self.paginator.get_paginated_response(body)
 
     @extend_schema(parameters=[FEED_ID_PARAM], summary="Search for Posts in a Feed (JSON)", description=textwrap.dedent("""
         Use this endpoint if you want to search through all Posts in a Feed. The response of this endpoint is JSON, and is useful if you're building a custom integration to a downstream tool. If you just want to import the data for this blog into your feed reader use the RSS version of this endpoint.
