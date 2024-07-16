@@ -18,9 +18,6 @@ from django.db.models import Count, Q
 from datetime import datetime
 import textwrap
 
-# 
-
-
 class Response(response.Response):
     DEFAULT_HEADERS = {
         'Access-Control-Allow-Origin': '*',
@@ -53,7 +50,7 @@ class PostView(
     class filterset_class(FilterSet):
         title = Filter(label="Filter by the content in a posts title. Will search for titles that contain the value entered.", lookup_expr='search')
         description = Filter(label="Filter by the content in a posts description. Will search for descriptions that contain the value entered.", lookup_expr='search')
-        job_id = Filter(label="Filter by job id")
+        job_id = Filter(label="Filter the Post by Job ID the Post was downloaded in.")
 
     def get_queryset(self):
         return Post.objects.filter(
@@ -100,7 +97,7 @@ class FeedView(viewsets.ModelViewSet):
         title = Filter(label="Filter by the content in feed title. Will search for titles that contain the value entered.", lookup_expr='search')
         description = Filter(label="Filter by the content in feed description. Will search for descriptions that contain the value entered.", lookup_expr='search')
         url = Filter(label="Filter by the content in a feeds URL. Will search for URLs that contain the value entered.", lookup_expr='icontains')
-        id = BaseCSVFilter(label="Filter by id(s), comma-separated, e.g 6c6e6448-04d4-42a3-9214-4f0f7d02694e,2bce5b30-7014-4a5d-ade7-12913fe6ac36", lookup_expr='in')
+        id = BaseCSVFilter(label="Filter by feed id(s), comma-separated, e.g 6c6e6448-04d4-42a3-9214-4f0f7d02694e,2bce5b30-7014-4a5d-ade7-12913fe6ac36", lookup_expr='in')
     
 
     def get_queryset(self):
