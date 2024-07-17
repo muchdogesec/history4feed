@@ -159,14 +159,6 @@ SPECTACULAR_SETTINGS = {
         'email': 'noreply@dogesec.com',
         'url': 'https://github.com/muchdogesec/history4feed',
     },
-    # 'SERVERS':[
-    #     {
-    #     'url': conf.server_host_path
-    # }
-    # ],
-    # 'SERVE_INCLUDE_SCHEMA': False,
-    # OTHER SETTINGS
-    'SWAGGER_UI_DIST': "http://127.0.0.1:8000/schema/swagger-ui/",
     'TAGS': [
         {
             "name": "Feeds",
@@ -180,12 +172,9 @@ SPECTACULAR_SETTINGS = {
 
 }
 
-
-
-
 SCRAPFLY_KEY = os.getenv("SCRAPFLY_APIKEY")
 # H4F_CONCURRENT_TASKS = 1 if not SCRAPFLY_KEY else 20
-WAYBACK_BACKOFF_TIME = 20 #should be at least 20 seconds because wayback usually blocks your IP for a few minutes
+WAYBACK_BACKOFF_TIME = os.getenv("WAYBACK_BACKOFF_TIME") #should be at least 20 seconds because wayback usually blocks your IP for a few minutes
 
 EARLIEST_SEARCH_DATE = datetime.strptime(os.environ["EARLIEST_SEARCH_DATE"], "%Y-%m-%dT%H:%M:%SZ")
 WAYBACK_SLEEP_SECONDS = int(os.getenv("WAYBACK_SLEEP_SECONDS", 20))
