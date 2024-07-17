@@ -138,7 +138,8 @@ class MinMaxDateFilter(BaseFilterBackend):
 class XMLPostPagination(H4FPagination):
     def get_paginated_response_schema(self, schema):
         return {
-            'type': 'string'
+            'type': 'string',
+            'example': '<?xml version="1.0" ?>'
         }
     
     def get_paginated_response(self, data):
