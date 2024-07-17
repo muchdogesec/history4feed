@@ -166,7 +166,7 @@ SPECTACULAR_SETTINGS = {
     # ],
     # 'SERVE_INCLUDE_SCHEMA': False,
     # OTHER SETTINGS
-    'SWAGGER_UI_DIST': "https://petstore3.swagger.io/",
+    'SWAGGER_UI_DIST': "http://127.0.0.1:8000/schema/swagger-ui/",
     'TAGS': [
         {
             "name": "Feeds",
