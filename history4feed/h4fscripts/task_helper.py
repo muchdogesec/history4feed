@@ -111,7 +111,7 @@ def retrieve_full_text(self, _, job_id, post_id):
             post_id=post_id,
     )
     try:
-        if fulltext_job.job.feed.retrieve_full_text and not fulltext_job.post.is_full_text:
+        if not fulltext_job.post.is_full_text:
             fulltext_job.post.description, fulltext_job.post.content_type = h4f.get_full_text(fulltext_job.post.link)
         fulltext_job.status = models.FullTextState.RETRIEVED
         fulltext_job.error_str = ""

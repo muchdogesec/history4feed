@@ -41,7 +41,6 @@ class Feed(models.Model):
     latest_item_pubdate = models.DateTimeField(null=True, help_text="pubdate of latest post")
     datetime_added = models.DateTimeField(auto_now_add=True, editable=False, help_text="date feed entry was added to database")
     feed_type = models.CharField(choices=FeedType.choices, max_length=12, null=False, editable=False, help_text="type of feed")
-    retrieve_full_text = models.BooleanField(default=True, help_text="choose whether or not the server should fetch full text for this feed. default: True")
 
     def get_post_count(self):
         return self.posts.count()

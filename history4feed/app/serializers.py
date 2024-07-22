@@ -26,5 +26,5 @@ class JobSerializer(serializers.ModelSerializer):
 
 
 class H4FError(serializers.Serializer):
-    message = serializers.CharField()
+    detail = serializers.CharField()
     code = serializers.IntegerField()

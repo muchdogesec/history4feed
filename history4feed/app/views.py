@@ -73,7 +73,7 @@ class Response(response.Response):
 
 class ErrorResp(Response):
     def __init__(self, status, title, details=None):
-        super().__init__({"message": title, "code": status}, status=status)
+        super().__init__({"detail": title, "code": status}, status=status)
 
 
 # Create your views here.
@@ -221,7 +221,8 @@ class FeedView(viewsets.ModelViewSet):
         tags=open_api_tags,
         responses={
             200: FeedSerializer,
-            406: OpenApiResponse(H4FError, "Invalid feed url", examples=[OpenApiExample(name="http-406", value={"message": "invalid feed url", "code": 406})]),
+            400: OpenApiResponse(H4FError, "Bad request", examples=[HTTP400_EXAMPLE]),
+            406: OpenApiResponse(H4FError, "Invalid feed url", examples=[OpenApiExample(name="http-406", value={"detail": "invalid feed url", "code": 406})]),
         },
     )
     def create(self, request: request.Request, **kwargs):
