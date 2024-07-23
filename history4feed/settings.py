@@ -143,7 +143,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     # YOUR SETTINGS
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'history4feed.app.autoschema.H4FSchema',
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
     'DEFAULT_AUTHENTICATION_CLASSES': [],
 }
@@ -159,14 +159,6 @@ SPECTACULAR_SETTINGS = {
         'email': 'noreply@dogesec.com',
         'url': 'https://github.com/muchdogesec/history4feed',
     },
-    # 'SERVERS':[
-    #     {
-    #     'url': conf.server_host_path
-    # }
-    # ],
-    # 'SERVE_INCLUDE_SCHEMA': False,
-    # OTHER SETTINGS
-    'SWAGGER_UI_DIST': "https://petstore3.swagger.io/",
     'TAGS': [
         {
             "name": "Feeds",
@@ -180,13 +172,15 @@ SPECTACULAR_SETTINGS = {
 
 }
 
-
-
-
 SCRAPFLY_KEY = os.getenv("SCRAPFLY_APIKEY")
 # H4F_CONCURRENT_TASKS = 1 if not SCRAPFLY_KEY else 20
-WAYBACK_BACKOFF_TIME = 20 #should be at least 20 seconds because wayback usually blocks your IP for a few minutes
+WAYBACK_BACKOFF_TIME = os.getenv("WAYBACK_BACKOFF_TIME") #should be at least 20 seconds because wayback usually blocks your IP for a few minutes
 
 EARLIEST_SEARCH_DATE = datetime.strptime(os.environ["EARLIEST_SEARCH_DATE"], "%Y-%m-%dT%H:%M:%SZ")
 WAYBACK_SLEEP_SECONDS = int(os.getenv("WAYBACK_SLEEP_SECONDS", 20))
 REQUEST_RETRY_COUNT = int(os.getenv("REQUEST_RETRY_COUNT", 3))
+
+DEFAULT_PAGE_SIZE = os.getenv("DEFAULT_PAGE_SIZE")
+MAX_PAGE_SIZE = os.getenv("MAX_PAGE_SIZE")
+
+HISTORY4FEED_NAMESPACE = "6c6e6448-04d4-42a3-9214-4f0f7d02694e"

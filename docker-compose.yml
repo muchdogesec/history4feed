@@ -46,7 +46,6 @@ services:
         image: postgres
         env_file:
           - ./.env
-
         volumes:
             - pgdata:/var/lib/postgresql/data/
         healthcheck:
@@ -57,6 +56,5 @@ services:
             timeout: 10s
     redis:
         image: "redis:alpine"
-        
 volumes:
     pgdata:

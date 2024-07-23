@@ -23,3 +23,8 @@ class JobSerializer(serializers.ModelSerializer):
         model = Job
         # fields = '__all__'
         exclude = ['feed']
+
+
+class H4FError(serializers.Serializer):
+    detail = serializers.CharField()
+    code = serializers.IntegerField()
