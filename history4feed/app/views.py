@@ -231,7 +231,7 @@ class FeedView(viewsets.ModelViewSet):
         try:
             feed = h4f.parse_feed_from_url(s.data["url"])
         except Exception as e:
-            return ErrorResp(406, str(e))
+            return ErrorResp(406, "Invalid feed url", details={"error": str(e)})
         s.run_validation(feed)
         feed_obj: Feed = s.create(validated_data=feed)
         job_obj = task_helper.new_job(feed_obj)
@@ -263,6 +263,7 @@ class FeedView(viewsets.ModelViewSet):
             "job_state": job_obj.state,
             "id": feed_obj.id,
             "job_id": job_obj.id,
+            "title": feed_obj.title,
         }
         return Response(feed)
 
