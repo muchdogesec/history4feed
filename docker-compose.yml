@@ -1,7 +1,7 @@
 version: "3.8"
    
 services:
-    h4f_django:
+    django:
         build: .
         command: >
                 bash -c "
@@ -15,7 +15,7 @@ services:
             - 8000:8000
         environment:
             - DEBUG=1
-            - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1] h4f_django
+            - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1] django
             - CELERY_BROKER_URL=redis://redis:6379/0
         env_file:
             - ./.env
@@ -40,7 +40,7 @@ services:
         env_file:
             - ./.env
         depends_on:
-            - h4f_django
+            - django
             - redis
     pgdb:
         image: postgres
