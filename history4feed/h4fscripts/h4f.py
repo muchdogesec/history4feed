@@ -67,7 +67,7 @@ def fetch_page(session, url, headers=None) -> tuple[bytes, str, str]:
     return content, resp.headers.get("content-type"), resp.url
 
 def parse_feed_from_url(url):
-    data, content_type, url = fetch_page_with_retries(url)
+    data, content_type, url = fetch_page_with_retries(url, retry_count=0)
     return parse_feed_from_content(data, url)
 
 def parse_feed_from_content(data: bytes, url: str):

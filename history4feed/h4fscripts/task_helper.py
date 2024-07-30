@@ -86,7 +86,7 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
             for post_dict in posts.values():
                 categories = post_dict.categories
                 del post_dict.categories
-                post, created = models.Post.objects.get_or_create(defaults=post_dict.__dict__, feed=db_feed, link=post_dict.link, job_id=job_id)
+                post, created = models.Post.objects.get_or_create(defaults={**post_dict.__dict__, "job_id":job_id}, feed=db_feed, link=post_dict.link)
                 if not created:
                     continue
                 db_feed.earliest_item_pubdate = min(db_feed.earliest_item_pubdate or post.pubdate, post.pubdate)
