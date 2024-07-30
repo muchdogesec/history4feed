@@ -7,7 +7,7 @@ services:
                 bash -c "
                     python manage.py makemigrations &&
                             python manage.py migrate &&
-                            gunicorn history4feed.wsgi:application --bind 0.0.0.0:8000
+                            gunicorn history4feed.wsgi:application --bind 0.0.0.0:8000 --reload
                         "
         volumes:
             - .:/usr/src/app/
