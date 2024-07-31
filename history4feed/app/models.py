@@ -1,5 +1,6 @@
 from textwrap import dedent
 from typing import Iterable
+from urllib.parse import urlparse
 import uuid
 from django.conf import settings
 from django.db import models
@@ -41,6 +42,7 @@ class Feed(models.Model):
     latest_item_pubdate = models.DateTimeField(null=True, help_text="pubdate of latest post")
     datetime_added = models.DateTimeField(auto_now_add=True, editable=False, help_text="date feed entry was added to database")
     feed_type = models.CharField(choices=FeedType.choices, max_length=12, null=False, editable=False, help_text="type of feed")
+    include_remote_blogs = models.BooleanField(default=False)
 
     def get_post_count(self):
         return self.posts.count()
@@ -52,6 +54,9 @@ class Feed(models.Model):
     @staticmethod
     def stix_id(url):
         return uuid.uuid5(uuid.UUID(settings.HISTORY4FEED_NAMESPACE), url)
+    
+    def should_skip_post(self, post_link: str):
+        return (not self.include_remote_blogs) or urlparse(self.url).hostname != urlparse(post_link).hostname
 
 class Job(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, help_text="UUID of job")

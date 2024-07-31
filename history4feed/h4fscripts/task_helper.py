@@ -87,7 +87,7 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
                 raise exceptions.UnknownFeedtypeException("unknown feed type `{}` at {}".format(parsed_feed['feed_type'], url))
             for post_dict in posts.values():
                 # make sure that post and feed share the same domain
-                if is_remote_post(db_feed.url, post_dict.link):
+                if db_feed.should_skip_post(post_dict.link):
                     models.FulltextJob.objects.create(
                             job_id=job_id,
                             status=models.FullTextState.SKIPPED
