@@ -56,7 +56,7 @@ class Feed(models.Model):
         return uuid.uuid5(uuid.UUID(settings.HISTORY4FEED_NAMESPACE), url)
     
     def should_skip_post(self, post_link: str):
-        return (not self.include_remote_blogs) or urlparse(self.url).hostname != urlparse(post_link).hostname
+        return (not self.include_remote_blogs) and urlparse(self.url).hostname != urlparse(post_link).hostname
 
 class Job(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, help_text="UUID of job")
