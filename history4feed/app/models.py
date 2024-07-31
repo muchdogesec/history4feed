@@ -62,6 +62,14 @@ class Job(models.Model):
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
     info = models.CharField(max_length=FEED_DESCRIPTION_MAX_LENGTH, help_text="contains a useful summary of the job (e.g. number of posts retrieved, errors logged)")
 
+    def urls(self):
+        retval = {}
+        ft_job: FulltextJob = None
+        for ft_job in self.fulltext_jobs.all():
+            retval[ft_job.status] = retval.get(ft_job.status, [])
+            retval[ft_job.status].append(ft_job.post.link)
+        return retval
+
 
 class FullTextState(models.TextChoices):
     RETRIEVED  = "retrieved"
@@ -94,7 +102,7 @@ class Post(models.Model):
         self.categories.set(categories)
 
 class FulltextJob(models.Model):
-    post = models.OneToOneField(Post, on_delete=models.CASCADE)
+    post = models.OneToOneField(Post, on_delete=models.CASCADE, null=True)
     job = models.ForeignKey(Job, related_name="fulltext_jobs", on_delete=models.CASCADE)
     status = models.CharField(max_length=15, choices=FullTextState.choices, default=FullTextState.RETRIEVING)
     error_str = models.CharField(max_length=1500, null=True, blank=True)

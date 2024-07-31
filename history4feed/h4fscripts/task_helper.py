@@ -9,6 +9,8 @@ from . import h4f, wayback_helpers, logger, exceptions
 from datetime import datetime
 from django.conf import settings
 
+from urllib.parse import urlparse
+
 def new_job(feed: models.Feed):
     job_obj = models.Job.objects.create(
         feed=feed,
@@ -84,6 +86,13 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
             else:
                 raise exceptions.UnknownFeedtypeException("unknown feed type `{}` at {}".format(parsed_feed['feed_type'], url))
             for post_dict in posts.values():
+                # make sure that post and feed share the same domain
+                if is_remote_post(db_feed.url, post_dict.link):
+                    models.FulltextJob.objects.create(
+                            job_id=job_id,
+                            status=models.FullTextState.SKIPPED
+                    )
+                    continue
                 categories = post_dict.categories
                 del post_dict.categories
                 post, created = models.Post.objects.get_or_create(defaults={**post_dict.__dict__, "job_id":job_id}, feed=db_feed, link=post_dict.link)
@@ -123,3 +132,9 @@ def retrieve_full_text(self, _, job_id, post_id):
     fulltext_job.post.save()
     logger.print(f"{self}")
 
+
+
+def is_remote_post(url1, url2):
+    uri1 = urlparse(url1)
+    uri2 = urlparse(url2)
+    return uri1.hostname != uri2.hostname
