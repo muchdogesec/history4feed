@@ -1,5 +1,6 @@
 from textwrap import dedent
 from typing import Iterable
+from urllib.parse import urlparse
 import uuid
 from django.conf import settings
 from django.db import models
@@ -41,6 +42,7 @@ class Feed(models.Model):
     latest_item_pubdate = models.DateTimeField(null=True, help_text="pubdate of latest post")
     datetime_added = models.DateTimeField(auto_now_add=True, editable=False, help_text="date feed entry was added to database")
     feed_type = models.CharField(choices=FeedType.choices, max_length=12, null=False, editable=False, help_text="type of feed")
+    include_remote_blogs = models.BooleanField(default=False)
 
     def get_post_count(self):
         return self.posts.count()
@@ -52,6 +54,9 @@ class Feed(models.Model):
     @staticmethod
     def stix_id(url):
         return uuid.uuid5(uuid.UUID(settings.HISTORY4FEED_NAMESPACE), url)
+    
+    def should_skip_post(self, post_link: str):
+        return (not self.include_remote_blogs) and urlparse(self.url).hostname != urlparse(post_link).hostname
 
 class Job(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, help_text="UUID of job")
@@ -61,6 +66,14 @@ class Job(models.Model):
     latest_item_requested = models.DateTimeField(null=True, help_text="shows the latest time for posts requested")
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
     info = models.CharField(max_length=FEED_DESCRIPTION_MAX_LENGTH, help_text="contains a useful summary of the job (e.g. number of posts retrieved, errors logged)")
+
+    def urls(self):
+        retval = {}
+        ft_job: FulltextJob = None
+        for ft_job in self.fulltext_jobs.all():
+            retval[ft_job.status] = retval.get(ft_job.status, [])
+            retval[ft_job.status].append(ft_job.post.link)
+        return retval
 
 
 class FullTextState(models.TextChoices):
@@ -94,7 +107,7 @@ class Post(models.Model):
         self.categories.set(categories)
 
 class FulltextJob(models.Model):
-    post = models.OneToOneField(Post, on_delete=models.CASCADE)
+    post = models.OneToOneField(Post, on_delete=models.CASCADE, null=True)
     job = models.ForeignKey(Job, related_name="fulltext_jobs", on_delete=models.CASCADE)
     status = models.CharField(max_length=15, choices=FullTextState.choices, default=FullTextState.RETRIEVING)
     error_str = models.CharField(max_length=1500, null=True, blank=True)

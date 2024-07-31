@@ -16,9 +16,16 @@ class PostSerializer(serializers.ModelSerializer):
         exclude = ['feed', 'job']
         # fields = '__all__'
 
+class JobUrlStatusSerializer(serializers.Serializer):
+    retrieved = serializers.ListField(child=serializers.CharField(), allow_null=True, default=[])
+    skipped = serializers.ListField(child=serializers.CharField(), allow_null=True, default=[])
+    failed = serializers.ListField(child=serializers.CharField(), allow_null=True, default=[])
+    retrieving = serializers.ListField(child=serializers.CharField(), allow_null=True, default=[])
+
 class JobSerializer(serializers.ModelSerializer):
     count_of_items = serializers.IntegerField(read_only=True)
     feed_id = serializers.UUIDField(read_only=True, source='feed.id')
+    urls = JobUrlStatusSerializer()
     class Meta:
         model = Job
         # fields = '__all__'
