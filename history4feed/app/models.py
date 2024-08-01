@@ -48,7 +48,8 @@ class Feed(models.Model):
         return self.posts.count()
     
     def save(self, *args, **kwargs) -> None:
-        self.id = self.stix_id(self.url)
+        if not self.id:
+            self.id = self.stix_id(self.url)
         return super().save(*args, **kwargs)
     
     @staticmethod
