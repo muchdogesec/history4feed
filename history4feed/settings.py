@@ -174,13 +174,13 @@ SPECTACULAR_SETTINGS = {
 
 SCRAPFLY_KEY = os.getenv("SCRAPFLY_APIKEY")
 # H4F_CONCURRENT_TASKS = 1 if not SCRAPFLY_KEY else 20
-WAYBACK_BACKOFF_TIME = os.getenv("WAYBACK_BACKOFF_TIME") #should be at least 20 seconds because wayback usually blocks your IP for a few minutes
+WAYBACK_BACKOFF_TIME = int(os.getenv("WAYBACK_BACKOFF_TIME")) #should be at least 20 seconds because wayback usually blocks your IP for a few minutes
 
 EARLIEST_SEARCH_DATE = datetime.strptime(os.environ["EARLIEST_SEARCH_DATE"], "%Y-%m-%dT%H:%M:%SZ")
 WAYBACK_SLEEP_SECONDS = int(os.getenv("WAYBACK_SLEEP_SECONDS", 20))
 REQUEST_RETRY_COUNT = int(os.getenv("REQUEST_RETRY_COUNT", 3))
 
-DEFAULT_PAGE_SIZE = os.getenv("DEFAULT_PAGE_SIZE", 50)
-MAX_PAGE_SIZE = os.getenv("MAX_PAGE_SIZE", 50)
+DEFAULT_PAGE_SIZE = int(os.getenv("DEFAULT_PAGE_SIZE", 50))
+MAX_PAGE_SIZE = int(os.getenv("MAX_PAGE_SIZE", 50))
 
 HISTORY4FEED_NAMESPACE = "6c6e6448-04d4-42a3-9214-4f0f7d02694e"
