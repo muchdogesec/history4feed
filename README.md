@@ -64,13 +64,13 @@ e.g. `EARLIEST_SEARCH_DATE=2020-01-01T00:00:00Z` will import all posts with a pu
 ### Build the Docker Image
 
 ```shell
-sudo docker-compose build
+sudo docker compose build
 ```
 
 ### Start the server
 
 ```shell
-sudo docker-compose up
+sudo docker compose up
 ```
 
 ### Access the server
@@ -86,7 +86,7 @@ The webserver is Django.
 To create an admin user in Django
 
 ```shell
-sudo docker-compose run django python manage.py createsuperuser
+sudo docker compose run django python manage.py createsuperuser
 ```
 
 You can then access the admin dashboard via:
