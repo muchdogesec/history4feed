@@ -9,6 +9,8 @@ from . import h4f, wayback_helpers, logger, exceptions
 from datetime import datetime
 from django.conf import settings
 
+from urllib.parse import urlparse
+
 def new_job(feed: models.Feed):
     job_obj = models.Job.objects.create(
         feed=feed,
@@ -47,7 +49,7 @@ def retrieve_posts_from_link(job_id, urls):
             continue
         if not posts:
             continue
-        full_text_chain = celery.chain([retrieve_full_text.s(job_id, post.id) for post in posts])
+        full_text_chain = celery.chain([retrieve_full_text.s(job_id, post.id, post.link) for post in posts])
         chains.append(full_text_chain.apply_async(args=(None,)))
 
     for k, v in parsed_feed.items():
@@ -68,7 +70,7 @@ def collect_and_schedule_removal(sender, job_id):
 
 def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
     back_off_seconds = settings.WAYBACK_SLEEP_SECONDS
-    all_posts = []
+    all_posts: list[models.Post] = []
     error = None
     parsed_feed = {}
     for i in range(settings.REQUEST_RETRY_COUNT):
@@ -84,6 +86,14 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
             else:
                 raise exceptions.UnknownFeedtypeException("unknown feed type `{}` at {}".format(parsed_feed['feed_type'], url))
             for post_dict in posts.values():
+                # make sure that post and feed share the same domain
+                if db_feed.should_skip_post(post_dict.link):
+                    models.FulltextJob.objects.create(
+                            job_id=job_id,
+                            status=models.FullTextState.SKIPPED,
+                            link=post_dict.link,
+                    )
+                    continue
                 categories = post_dict.categories
                 del post_dict.categories
                 post, created = models.Post.objects.get_or_create(defaults={**post_dict.__dict__, "job_id":job_id}, feed=db_feed, link=post_dict.link)
@@ -105,10 +115,11 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
     return parsed_feed, all_posts, error
         
 @shared_task(bind=True)
-def retrieve_full_text(self, _, job_id, post_id):
+def retrieve_full_text(self, _, job_id, post_id, link):
     fulltext_job = models.FulltextJob.objects.create(
             job_id=job_id,
             post_id=post_id,
+            link=link,
     )
     try:
         if not fulltext_job.post.is_full_text:
@@ -123,3 +134,9 @@ def retrieve_full_text(self, _, job_id, post_id):
     fulltext_job.post.save()
     logger.print(f"{self}")
 
+
+
+def is_remote_post(url1, url2):
+    uri1 = urlparse(url1)
+    uri2 = urlparse(url2)
+    return uri1.hostname != uri2.hostname

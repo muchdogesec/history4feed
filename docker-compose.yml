@@ -1,18 +1,17 @@
-version: "3.8"
-   
 services:
     django:
         build: .
         command: >
                 bash -c "
-                    python manage.py makemigrations &&
-                            python manage.py migrate &&
-                            gunicorn history4feed.wsgi:application --bind 0.0.0.0:8000 --reload
+                    python manage.py collectstatic --no-input &&
+                        python manage.py makemigrations &&
+                                python manage.py migrate &&
+                                    gunicorn history4feed.wsgi:application --bind 0.0.0.0:8002 --reload
                         "
         volumes:
             - .:/usr/src/app/
         ports:
-            - 8000:8000
+            - 8002:8002
         environment:
             - DEBUG=1
             - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1] django

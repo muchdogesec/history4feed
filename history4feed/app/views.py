@@ -215,7 +215,9 @@ class FeedView(viewsets.ModelViewSet):
         summary="Create a new Feed",
         description=textwrap.dedent(
             """
-        Use this endpoint to create to a new feed. The `url` value used should be a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned. Generally you should set `retrieve_full_text` to `true`. If you are certain the blog you are subscribing to has a full text feed already, you can safely set this to `false`. If `url` is already associated with an existing Feed, using it via this endpoint will trigger an update request for the blog. If you want to add the `url` with new settings, first delete it.
+        Use this endpoint to create to a new feed. The `url` value used should be a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned.\n\n
+        If the  `url` is already associated with an existing Feed, using it via this endpoint will trigger an update request for the blog. If you want to add the `url` with new settings, first delete the feed it is associated with.\n\n
+        `include_remote_blogs` is a boolean setting. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to `false`.
         """
         ),
         tags=open_api_tags,

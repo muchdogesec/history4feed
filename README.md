@@ -64,20 +64,20 @@ e.g. `EARLIEST_SEARCH_DATE=2020-01-01T00:00:00Z` will import all posts with a pu
 ### Build the Docker Image
 
 ```shell
-sudo docker-compose build
+sudo docker compose build
 ```
 
 ### Start the server
 
 ```shell
-sudo docker-compose up
+sudo docker compose up
 ```
 
 ### Access the server
 
-The webserver (Django) should now be running on: http://127.0.0.1:8000/
+The webserver (Django) should now be running on: http://127.0.0.1:8002/
 
-You can access the Swagger UI for the API in a browser at: http://127.0.0.1:8000/api/schema/swagger-ui/
+You can access the Swagger UI for the API in a browser at: http://127.0.0.1:8002/api/schema/swagger-ui/
 
 #### Note on Django
 
@@ -86,12 +86,12 @@ The webserver is Django.
 To create an admin user in Django
 
 ```shell
-sudo docker-compose run django python manage.py createsuperuser
+sudo docker compose run django python manage.py createsuperuser
 ```
 
 You can then access the admin dashboard via:
 
-http://127.0.0.1:8000/admin
+http://127.0.0.1:8002/admin
 
 Note, if you intend on using this in production, you should also modify the variables in the `.env` file for `POSTGRES_USER`, `POSTGRES_PASS`, and `DJANGO_SECRET`.
 
