@@ -64,4 +64,3 @@ XML_RESPONSE = OpenApiResponse(
 
 HTTP404_EXAMPLE = OpenApiExample("http-404", {"detail": "resource not found", "code": 404})
 HTTP400_EXAMPLE = OpenApiExample("http-400", {"detail": "request not understood", "code": 400})
-

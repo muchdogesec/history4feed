@@ -113,8 +113,3 @@ class FulltextJob(models.Model):
     status = models.CharField(max_length=15, choices=FullTextState.choices, default=FullTextState.RETRIEVING)
     error_str = models.CharField(max_length=1500, null=True, blank=True)
     link = models.CharField(max_length=1500)
-
-
-
-
-
