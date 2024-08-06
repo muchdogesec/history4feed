@@ -174,7 +174,7 @@ SPECTACULAR_SETTINGS = {
 
 SCRAPFLY_KEY = os.getenv("SCRAPFLY_APIKEY")
 # H4F_CONCURRENT_TASKS = 1 if not SCRAPFLY_KEY else 20
-WAYBACK_BACKOFF_TIME = int(os.getenv("WAYBACK_BACKOFF_TIME")) #should be at least 20 seconds because wayback usually blocks your IP for a few minutes
+WAYBACK_BACKOFF_TIME = int(os.getenv("WAYBACK_BACKOFF_TIME", 20)) #should be at least 20 seconds because wayback usually blocks your IP for a few minutes
 
 EARLIEST_SEARCH_DATE = datetime.strptime(os.environ["EARLIEST_SEARCH_DATE"], "%Y-%m-%dT%H:%M:%SZ")
 WAYBACK_SLEEP_SECONDS = int(os.getenv("WAYBACK_SLEEP_SECONDS", 20))
