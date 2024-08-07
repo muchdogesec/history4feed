@@ -185,4 +185,4 @@ REQUEST_RETRY_COUNT = int(os.getenv("REQUEST_RETRY_COUNT", 3))
 DEFAULT_PAGE_SIZE = int(os.getenv("DEFAULT_PAGE_SIZE", 50))
 MAX_PAGE_SIZE = int(os.getenv("MAX_PAGE_SIZE", 50))
 
-HISTORY4FEED_NAMESPACE = "6c6e6448-04d4-42a3-9214-4f0f7d02694e"
+HISTORY4FEED_NAMESPACE = "6c6e6448-04d4-42a3-9214-4f0f7d02694e" # this is randomly generated and is used to ensure urls for same blogs have same id
