@@ -1,7 +1,7 @@
 import time
 from celery import shared_task
 import celery
-from celery.result import ResultSet
+from celery.result import ResultSet, AsyncResult
 
 from ..app import models
 from django.conf import settings
@@ -18,7 +18,7 @@ def new_job(feed: models.Feed):
         latest_item_requested=datetime.now(),
     )
     # earliest_entry = feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE
-    start_job.s(job_obj.pk).apply_async(countdown=5)
+    (start_job.s(job_obj.pk)| retrieve_posts_from_links.s(job_obj.pk) | wait_for_all_with_retry.s() | collect_and_schedule_removal.si(job_obj.pk)).apply_async(countdown=5)
     return job_obj
 
 @shared_task
@@ -28,17 +28,26 @@ def start_job(job_id):
     job.state = models.JobState.RUNNING
     job.save()
     try:
-        urls = wayback_helpers.get_wayback_urls(feed.url, job.earliest_item_requested, job.latest_item_requested)
-        retrieve_posts_from_link.apply_async((job_id, urls), link=collect_and_schedule_removal.s(job_id))
+        return wayback_helpers.get_wayback_urls(feed.url, job.earliest_item_requested, job.latest_item_requested)
     except BaseException as e:
         job.state = models.JobState.FAILED
         job.info = str(e)
         job.save()
+        return []
 
-
+@shared_task(bind=True, default_retry_delay=10)
+def wait_for_all_with_retry(self, result_ids):
+    if not result_ids:
+        return []
+    result_set = ResultSet([AsyncResult(task_id) for task_id in result_ids])
+    if not result_set.ready():
+        return self.retry(max_retries=360)
+    return result_ids
 
 @shared_task
-def retrieve_posts_from_link(job_id, urls):
+def retrieve_posts_from_links(urls, job_id):
+    if not urls:
+        return []
     full_text_chain = models.Job.objects.get(pk=job_id)
     feed = full_text_chain.feed
     chains = []
@@ -49,24 +58,32 @@ def retrieve_posts_from_link(job_id, urls):
             continue
         if not posts:
             continue
-        full_text_chain = celery.chain([retrieve_full_text.s(job_id, post.id, post.link) for post in posts])
-        chains.append(full_text_chain.apply_async(args=(None,)))
+
+        chain_tasks = []
+        for post in posts:
+            ftjob_entry = models.FulltextJob.objects.create(
+                job_id=job_id,
+                post_id=post.id,
+                link=post.link,
+            )
+            chain_tasks.append(retrieve_full_text.si(ftjob_entry.pk))
+        full_text_chain = celery.chain(chain_tasks)
+        chains.append(full_text_chain.apply_async())
 
     for k, v in parsed_feed.items():
         setattr(feed, k, v)
     feed.save()
-    fulltext_result_set = ResultSet(chains)
-    while not fulltext_result_set.ready():
-        time.sleep(10)
-    logger.info(f"JOB with id `{job_id}` completed")
+    logger.info("====\n"*20)
+    return [result.id for result in chains]
 
 
-@shared_task
+@shared_task(bind=True)
 def collect_and_schedule_removal(sender, job_id):
     logger.print(f"===> {sender=}, {job_id=} ")
     job = models.Job.objects.get(pk=job_id)
-    job.state = models.JobState.SUCCESS
-    job.save()
+    if job.state == models.JobState.RUNNING:
+        job.state = models.JobState.SUCCESS
+        job.save()
 
 def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
     back_off_seconds = settings.WAYBACK_SLEEP_SECONDS
@@ -115,12 +132,8 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
     return parsed_feed, all_posts, error
         
 @shared_task(bind=True)
-def retrieve_full_text(self, _, job_id, post_id, link):
-    fulltext_job = models.FulltextJob.objects.create(
-            job_id=job_id,
-            post_id=post_id,
-            link=link,
-    )
+def retrieve_full_text(self, ftjob_pk):
+    fulltext_job = models.FulltextJob.objects.get(pk=ftjob_pk)
     try:
         if not fulltext_job.post.is_full_text:
             fulltext_job.post.description, fulltext_job.post.content_type = h4f.get_full_text(fulltext_job.post.link)
