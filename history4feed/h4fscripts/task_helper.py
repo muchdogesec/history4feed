@@ -129,6 +129,9 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
             error = e
             logger.info(f"job with url {url} ran into an issue {e}, backing off for {back_off_seconds} seconds")
             back_off_seconds *= 1.2
+        except BaseException as e:
+            error = e
+            break
     return parsed_feed, all_posts, error
         
 @shared_task(bind=True)
