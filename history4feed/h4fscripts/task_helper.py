@@ -97,9 +97,9 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
             data, content_type, url = h4f.fetch_page_with_retries(url)
             parsed_feed = h4f.parse_feed_from_content(data, url)
             if parsed_feed['feed_type'] == models.FeedType.ATOM:
-                posts = h4f.parse_posts_from_atom_feed(data)
+                posts = h4f.parse_posts_from_atom_feed(url, data)
             elif parsed_feed['feed_type'] == models.FeedType.RSS:
-                posts = h4f.parse_posts_from_rss_feed(data)
+                posts = h4f.parse_posts_from_rss_feed(url, data)
             else:
                 raise exceptions.UnknownFeedtypeException("unknown feed type `{}` at {}".format(parsed_feed['feed_type'], url))
             for post_dict in posts.values():
@@ -130,6 +130,7 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
             logger.info(f"job with url {url} ran into an issue {e}, backing off for {back_off_seconds} seconds")
             back_off_seconds *= 1.2
         except BaseException as e:
+            logger.error(e, exc_info=True)
             error = e
             break
     return parsed_feed, all_posts, error

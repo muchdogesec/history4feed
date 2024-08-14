@@ -12,6 +12,7 @@ from .import logger
 from .xml_utils import getAtomLink, getFirstChildByTag, getFirstElementByTag, getText
 from .exceptions import history4feedException, UnknownFeedtypeException, FetchRedirect, ScrapflyError
 import fake_useragent
+from urllib.parse import urljoin
 
 def fetch_page_with_retries(url, retry_count=3, sleep_seconds=settings.WAYBACK_SLEEP_SECONDS, **kwargs):
     ua = fake_useragent.UserAgent()
@@ -133,23 +134,23 @@ def parse_items(elem, link):
         content_type="plain/text",
     )
 
-def parse_posts_from_rss_feed(data):
+def parse_posts_from_rss_feed(base_url, data):
     entries = {}
     document = parse(BytesIO(data))
     channel = getFirstElementByTag(document, "channel")
 
     for item in channel.getElementsByTagName("item"):
-        link = getText(getFirstElementByTag(item, "link")).strip()
+        link = urljoin(base_url, getText(getFirstElementByTag(item, "link")).strip())
         entries[link] = parse_items(item, link)
         entries[link].description = parse_rss_description(item)
     return entries
 
-def parse_posts_from_atom_feed(data):
+def parse_posts_from_atom_feed(base_url, data):
     entries = {}
     document = parse(BytesIO(data))
 
     for item in document.getElementsByTagName("entry"):
-        link = getAtomLink(item, rel='alternate')
+        link = urljoin(base_url, getAtomLink(item, rel='alternate'))
         entries[link] = parse_items(item, link)
         entries[link].description, content_type = parse_atom_description(item)
         if content_type:
