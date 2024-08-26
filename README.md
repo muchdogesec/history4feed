@@ -2,6 +2,8 @@
 
 ## Overview
 
+![](docs/history4feed.png)
+
 It is common for feeds (RSS or XML) to only include a limited number of posts. I generally see the latest 3 - 5 posts of a blog in a feed. For blogs that have been operating for years, this means potentially thousands of posts are missed.
 
 There is no way to page through historic articles using an RSS or ATOM feed (they were not designed for this), which means the first poll of the feed will only contain the limited number of articles in the feed. This limit is defined by the blog owner.
@@ -20,6 +22,8 @@ history4feed offers an API interface that;
 ## tl;dr
 
 [![history4feed](https://img.youtube.com/vi/z1ATbiecbg4/0.jpg)](https://www.youtube.com/watch?v=z1ATbiecbg4)
+
+[Watch the demo](https://www.youtube.com/watch?v=z1ATbiecbg4).
 
 ## Install
 
@@ -106,4 +110,4 @@ Note, if you intend on using this in production, you should also modify the vari
 
 ## License
 
-[AGPLv3](/LICENSE).
+[Apache 2.0](/LICENSE).
