@@ -16,6 +16,10 @@ From the root of this code run;
 python3 tests/add_fakeblog123_feeds.py
 ```
 
+```shell
+python3 tests/delete_fakeblog123_feeds.py
+```
+
 Note, because we use a UUIDv5 IDs we know the IDs that will be generated (UUID generated from namespace; `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value `<URL OF BLOG>`).
 
 ### Testing WayBack machine
