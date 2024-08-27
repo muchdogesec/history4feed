@@ -16,6 +16,8 @@ From the root of this code run;
 python3 tests/add_fakeblog123_feeds.py
 ```
 
+And delete them like so;
+
 ```shell
 python3 tests/delete_fakeblog123_feeds.py
 ```
