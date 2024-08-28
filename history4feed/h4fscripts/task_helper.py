@@ -17,8 +17,21 @@ def new_job(feed: models.Feed):
         earliest_item_requested=feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE,
         latest_item_requested=datetime.now(),
     )
-    # earliest_entry = feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE
     (start_job.s(job_obj.pk)| retrieve_posts_from_links.s(job_obj.pk) | wait_for_all_with_retry.s() | collect_and_schedule_removal.si(job_obj.pk)).apply_async(countdown=5)
+    return job_obj
+
+def new_patch_posts_job(feed: models.Feed, posts: list[models.Post]):
+    job_obj = models.Job.objects.create(
+        feed=posts[0].feed,
+        state=models.JobState.RUNNING,
+    )
+    ft_jobs = [models.FulltextJob.objects.create(
+        job_id=job_obj.id,
+        post_id=post.id,
+        link=post.link,
+    ) for post in posts]
+    chain = celery.chain([retrieve_full_text.si(ft_job.pk) for ft_job in ft_jobs])
+    ( chain | collect_and_schedule_removal.si(job_obj.pk)).apply_async()
     return job_obj
 
 @shared_task

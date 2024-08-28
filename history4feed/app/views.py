@@ -77,6 +77,17 @@ class ErrorResp(Response):
 
 
 # Create your views here.
+@extend_schema_view(
+    partial_update=extend_schema(
+        description="fetch update for post",
+        summary="fetch update for post",
+        responses={
+            200: JobSerializer,
+            404: OpenApiResponse(H4FError, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
+        },
+        tags=["Feeds"],
+    ),
+)
 class PostView(
     mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
 ):
@@ -168,6 +179,18 @@ class PostView(
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
+    
+
+    def partial_update(self, request, *args, **kwargs):
+        post: Post = self.get_object()
+        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
+        job_resp = {
+            "datetime_added": post.datetime_added,
+            "job_state": job_obj.state,
+            "id": post.id,
+            "job_id": job_obj.id,
+        }
+        return Response(job_resp)
 
 
 class FeedView(viewsets.ModelViewSet):
