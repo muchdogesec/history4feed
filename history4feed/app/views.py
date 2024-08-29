@@ -79,8 +79,8 @@ class ErrorResp(Response):
 # Create your views here.
 @extend_schema_view(
     partial_update=extend_schema(
-        description="fetch update for post",
-        summary="fetch update for post",
+        description="Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.",
+        summary="Update a Post in a Feed",
         responses={
             200: JobSerializer,
             404: OpenApiResponse(H4FError, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
@@ -271,7 +271,8 @@ class FeedView(viewsets.ModelViewSet):
         request=None,
         description=textwrap.dedent(
             """
-        Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.
+        Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.\n\n
+        Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.
         """
         ),
         tags=open_api_tags,
