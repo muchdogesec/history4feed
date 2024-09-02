@@ -110,7 +110,7 @@ class PostView(
             label="Filter by the content in a posts description. Will search for descriptions that contain the value entered.",
             lookup_expr="search",
         )
-        job_id = Filter(label="Filter the Post by Job ID the Post was downloaded in.")
+        job_id = Filter(label="Filter the Post by Job ID the Post was downloaded in.", field_name="fulltext_jobs__job_id")
 
     def get_queryset(self):
         return Post.objects.filter(feed_id=self.kwargs.get("feed_id"))
@@ -187,8 +187,9 @@ class PostView(
         job_resp = {
             "datetime_added": post.datetime_added,
             "job_state": job_obj.state,
-            "id": post.id,
-            "job_id": job_obj.id,
+            "post_id": post.id,
+            "feed_id": post.feed.id,
+            "id": job_obj.id,
         }
         return Response(job_resp)
 

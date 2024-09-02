@@ -96,7 +96,6 @@ class Post(models.Model):
     author = models.CharField(max_length=1000, help_text="author of the post")
     categories = models.ManyToManyField(Category, related_name="posts", help_text="categories of the post")
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE, related_name="posts", help_text="feed id this item belongs too")
-    job = models.ForeignKey(Job, on_delete=models.SET_NULL, null=True)
     is_full_text = models.BooleanField(default=False, help_text="if full text has been retrieved")
     content_type = models.CharField(default="plain/text", max_length=200, help_text="content type of the description")
 
@@ -117,7 +116,7 @@ class Post(models.Model):
         return super().save(*args, **kwargs)
 
 class FulltextJob(models.Model):
-    post = models.ForeignKey(Post, on_delete=models.SET_NULL, null=True)
+    post = models.ForeignKey(Post, on_delete=models.SET_NULL, null=True, related_name="fulltext_jobs")
     job = models.ForeignKey(Job, related_name="fulltext_jobs", on_delete=models.CASCADE)
     status = models.CharField(max_length=15, choices=FullTextState.choices, default=FullTextState.RETRIEVING)
     error_str = models.CharField(max_length=1500, null=True, blank=True)

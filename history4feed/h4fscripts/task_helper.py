@@ -151,8 +151,7 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
 def retrieve_full_text(self, ftjob_pk):
     fulltext_job = models.FulltextJob.objects.get(pk=ftjob_pk)
     try:
-        if not fulltext_job.post.is_full_text:
-            fulltext_job.post.description, fulltext_job.post.content_type = h4f.get_full_text(fulltext_job.post.link)
+        fulltext_job.post.description, fulltext_job.post.content_type = h4f.get_full_text(fulltext_job.post.link)
         fulltext_job.status = models.FullTextState.RETRIEVED
         fulltext_job.error_str = ""
         fulltext_job.post.is_full_text = True
