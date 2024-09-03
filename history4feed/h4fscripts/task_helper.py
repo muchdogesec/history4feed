@@ -68,8 +68,10 @@ def retrieve_posts_from_links(urls, job_id):
     for index, url in enumerate(urls):
         parsed_feed, posts, error = retrieve_posts_from_url(url, feed, job_id)
         if error:
+            logger.exception(error)
             continue
         if not posts:
+            logger.warning('no new post in `%s`', url)
             continue
 
         chain_tasks = []
@@ -126,7 +128,7 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
                     continue
                 categories = post_dict.categories
                 del post_dict.categories
-                post, created = models.Post.objects.get_or_create(defaults={**post_dict.__dict__, "job_id":job_id}, feed=db_feed, link=post_dict.link)
+                post, created = models.Post.objects.get_or_create(defaults=post_dict.__dict__, feed=db_feed, link=post_dict.link)
                 if not created:
                     continue
                 db_feed.earliest_item_pubdate = min(db_feed.earliest_item_pubdate or post.pubdate, post.pubdate)
