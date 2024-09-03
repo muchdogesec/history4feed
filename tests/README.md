@@ -27,10 +27,12 @@ This contains 12 feed types, both ATOM and RSS feeds, all in three formats; 1) h
 
 The test;
 
-1. adds the feeds
-2. checks each feed id
-3. checks the posts have been indexed for one of the blogs
-4. deletes all the blogs
+1. deletes any old feeds that match those in the tests
+2. adds the feeds
+3. checks the jobs for the added feeds, until all are successful
+4. checks each feed id
+5. checks the posts have been indexed for one of the blogs
+6. deletes all the blogs
 
 Note, because we use a UUIDv5 ID (namespace `6c6e6448-04d4-42a3-9214-4f0f7d02694e`) to generate IDs we can hardcode the IDs. For;
 
@@ -38,6 +40,9 @@ Note, because we use a UUIDv5 ID (namespace `6c6e6448-04d4-42a3-9214-4f0f7d02694
 	* e.g. `https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-encoded.xml` = `d1d96b71-c687-50db-9d2b-d0092d1d163a`
 * posts: UUID generated from namespace and the value `<FEED_ID>+<POST_URL>+<POST_PUB_TIME>`
 	* e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`
+
+
+Note, if during development a test fails part way through, you can use the following script to clean 
 
 ## Manual Tests
 

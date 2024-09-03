@@ -2,10 +2,14 @@ import unittest
 import requests
 from unittest.mock import patch
 import time
+import json
+from datetime import datetime, timedelta
 
 class TestFeedAPI(unittest.TestCase):
 
     def setUp(self):
+        print("Setting up the test case...")
+
         # Define the base URL for the API requests
         self.base_url = "http://127.0.0.1:8002/api/v1/feeds/"
         self.job_base_url = "http://127.0.0.1:8002/api/v1/jobs/"
@@ -77,129 +81,149 @@ class TestFeedAPI(unittest.TestCase):
         # This dictionary will store the job_ids for each feed
         self.job_ids = {}
 
+        # Run the initial cleanup
+        self.cleanup_feeds()
+
+    def cleanup_feeds(self):
+        """
+        This method attempts to delete all known feeds until the API returns
+        a response indicating that no feeds match the given query.
+        """
+        print("Cleaning up existing feeds...")
+
+        headers = {'accept': 'application/json'}
+        for feed_id in list(self.feeds.values()):
+            delete_url = f"{self.base_url}{feed_id['id']}/"
+            while True:
+                response = requests.delete(delete_url, headers=headers)
+                if response.status_code == 404 and 'No Feed matches the given query.' in response.text:
+                    print(f"Feed {feed_id['id']} does not exist.")
+                    break
+                elif response.status_code == 204:
+                    print(f"Feed {feed_id['id']} deleted successfully.")
+                else:
+                    print(f"Unexpected response while deleting feed {feed_id['id']}: {response.status_code}")
+                    break
+
     @patch('requests.post')
-    def test_add_feeds(self, mock_post):
+    @patch('requests.get')
+    @patch('requests.delete')
+    def test_feed_lifecycle(self, mock_delete, mock_get, mock_post):
+        print("Running test_feed_lifecycle")
+
         # Mock the POST request to return a success status (200) and a job_id
-        def mock_post_side_effect(url, json):
-            feed_info = next(feed for feed_url, feed in self.feeds.items() if feed_url == json['url'])
+        def mock_post_side_effect(url, json_data=None, **kwargs):
+            print(f"POST request to URL: {url} with data: {json_data}")
+            if json_data is None:
+                raise ValueError("POST request data is None, expected a dictionary")
+            feed_info = next(feed for feed_url, feed in self.feeds.items() if feed_url == json_data['url'])
             job_id = f"{feed_info['id']}-job"
             response = requests.Response()
             response.status_code = 200
-            response._content = str.encode(f'''
-            {{
-                "description": "{feed_info["description"]}",
+            response._content = json.dumps({
+                "description": feed_info["description"],
                 "title": "Your awesome title",
-                "feed_type": "{feed_info["feed_type"]}",
-                "url": "{json["url"]}",
+                "feed_type": feed_info["feed_type"],
+                "url": json_data["url"],
                 "job_state": "pending",
-                "id": "{feed_info['id']}",
-                "job_id": "{job_id}"
-            }}
-            ''')
+                "id": feed_info['id'],
+                "job_id": job_id
+            }).encode('utf-8')
             return response
 
         mock_post.side_effect = mock_post_side_effect
 
-        # Iterate over the feeds and send a POST request for each URL
+        # Add feeds and track job_ids
         for url, feed_info in self.feeds.items():
             data = {
                 "url": url,
                 "include_remote_blogs": False
             }
-            
-            # Make the POST request
             response = requests.post(self.base_url, json=data)
-            
-            # Extract the job_id and store it
             job_id = response.json()['job_id']
             self.job_ids[feed_info['id']] = job_id
-            
-            # Check if the request was successful
             self.assertEqual(response.status_code, 200, f"POST request failed for URL: {url}")
+            print(f"POST request successful for {url}, job_id: {job_id}")
 
-    @patch('requests.get')
-    def test_check_job_status(self, mock_get):
-        # Expected URLs to be retrieved
+        # Check job statuses
         expected_urls = [
             "https://muchdogesec.github.io/fakeblog123/test3/2024/08/20/update-to-post-1.html",
             "https://muchdogesec.github.io/fakeblog123/test3/2024/08/07/testing-extractions-1.html",
             "https://muchdogesec.github.io/fakeblog123/test2/2024/08/05/testing-markdown-elements-1.html",
             "https://muchdogesec.github.io/fakeblog123/test1/2024/08/01/real-post-example-1.html"
         ]
-        
-        # Mock the GET request to check job status
+        count_of_items = 4
+        state = "success"
+
         def mock_get_side_effect(url):
             job_id = url.split('/')[-2]
             feed_id = next(feed_id for feed_id, job in self.job_ids.items() if job == job_id)
+            print(f"Checking job status for job_id: {job_id}")
+            
+            # Use placeholder strings for the datetime fields
+            run_datetime = "any_run_datetime_string"
+            earliest_item_requested = "any_earliest_item_requested_string"
+            latest_item_requested = "any_latest_item_requested_string"
+
             response = requests.Response()
             response.status_code = 200
-            response._content = str.encode(f'''
-            {{
-                "id": "{job_id}",
-                "count_of_items": 0,
-                "feed_id": "{feed_id}",
-                "urls": {{
-                    "retrieved": {expected_urls},
+            response._content = json.dumps({
+                "id": job_id,
+                "count_of_items": count_of_items,
+                "feed_id": feed_id,
+                "urls": {
+                    "retrieved": expected_urls,
                     "skipped": [],
                     "failed": [],
                     "retrieving": []
-                }},
-                "state": "success",
-                "run_datetime": "2024-09-03T06:00:22.270278Z",
-                "earliest_item_requested": "2020-01-01T00:00:00Z",
-                "latest_item_requested": "2024-09-03T06:00:22.269823Z",
+                },
+                "state": state,
+                "run_datetime": run_datetime,
+                "earliest_item_requested": earliest_item_requested,
+                "latest_item_requested": latest_item_requested,
                 "info": ""
-            }}
-            ''')
+            }).encode('utf-8')
             return response
 
         mock_get.side_effect = mock_get_side_effect
 
-        # Check the job status for each job_id until all jobs are successful
         for feed_id, job_id in self.job_ids.items():
             job_url = f"{self.job_base_url}{job_id}/"
             success = False
-
             while not success:
                 response = requests.get(job_url)
                 job_status = response.json()
-                
-                # Check if the job state is successful and the retrieved URLs match the expected list
                 if job_status['state'] == 'success' and set(job_status['urls']['retrieved']) == set(expected_urls):
                     success = True
                 else:
-                    time.sleep(1)  # Wait before checking again
-
-            # Final assertion to ensure the job was successful and URLs were retrieved
+                    time.sleep(1)
             self.assertTrue(success, f"Job {job_id} for feed {feed_id} did not complete successfully.")
+            print(f"Job {job_id} for feed {feed_id} completed successfully.")
 
-    @patch('requests.get')
-    def test_verify_feeds(self, mock_get):
-        # Mock the GET request to return the expected feed information
+        # Verify feeds
         for url, feed_info in self.feeds.items():
             feed_id = feed_info["id"]
             description = feed_info["description"]
             feed_type = feed_info["feed_type"]
             get_url = f"{self.base_url}{feed_id}/"
+            print(f"Verifying feed with ID: {feed_id}")
 
             mock_get.return_value.status_code = 200
             mock_get.return_value.json.return_value = {
                 "id": feed_id,
                 "url": url,
-                "count_of_posts": 4,  # Mocking count_of_posts to be 4 for each
+                "count_of_posts": 4,
                 "title": "Your awesome title",
                 "description": description,
                 "earliest_item_pubdate": None,
                 "latest_item_pubdate": None,
-                "datetime_added": "2024-09-03T05:13:03.126167Z",
+                "datetime_added": datetime.utcnow().isoformat() + "Z",
                 "feed_type": feed_type,
                 "include_remote_blogs": False
             }
 
             get_response = requests.get(get_url)
             self.assertEqual(get_response.status_code, 200, f"GET request failed for feed ID: {feed_id}")
-
-            # Check that the URL, ID, description, feed_type, and count_of_posts match what we expect
             response_data = get_response.json()
             self.assertEqual(response_data['id'], feed_id, f"ID mismatch for feed ID: {feed_id}")
             self.assertEqual(response_data['url'], url, f"URL mismatch for feed ID: {feed_id}")
@@ -207,22 +231,14 @@ class TestFeedAPI(unittest.TestCase):
             self.assertEqual(response_data['feed_type'], feed_type, f"Feed type mismatch for feed ID: {feed_id}")
             self.assertEqual(response_data['count_of_posts'], 4, f"count_of_posts mismatch for feed ID: {feed_id}")
 
-    @patch('requests.delete')
-    def test_delete_feeds(self, mock_delete):
-        # Mock the DELETE request to always return a success status (204)
+        # Delete feeds
         mock_delete.return_value.status_code = 204
-
-        # Iterate over the feeds and send a DELETE request for each feed ID
         for feed_info in self.feeds.values():
             feed_id = feed_info["id"]
             delete_url = f"{self.base_url}{feed_id}/"
-            
-            # Make the DELETE request
+            print(f"Deleting feed with ID: {feed_id}")
             delete_response = requests.delete(delete_url)
-            
-            # Check if the DELETE request was successful
             self.assertEqual(delete_response.status_code, 204, f"DELETE request failed for feed ID: {feed_id}")
 
-# To actually run the tests if this script is executed
 if __name__ == "__main__":
     unittest.main()
