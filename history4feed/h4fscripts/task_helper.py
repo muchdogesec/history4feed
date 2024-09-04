@@ -17,8 +17,21 @@ def new_job(feed: models.Feed):
         earliest_item_requested=feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE,
         latest_item_requested=datetime.now(),
     )
-    # earliest_entry = feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE
     (start_job.s(job_obj.pk)| retrieve_posts_from_links.s(job_obj.pk) | wait_for_all_with_retry.s() | collect_and_schedule_removal.si(job_obj.pk)).apply_async(countdown=5)
+    return job_obj
+
+def new_patch_posts_job(feed: models.Feed, posts: list[models.Post]):
+    job_obj = models.Job.objects.create(
+        feed=posts[0].feed,
+        state=models.JobState.RUNNING,
+    )
+    ft_jobs = [models.FulltextJob.objects.create(
+        job_id=job_obj.id,
+        post_id=post.id,
+        link=post.link,
+    ) for post in posts]
+    chain = celery.chain([retrieve_full_text.si(ft_job.pk) for ft_job in ft_jobs])
+    ( chain | collect_and_schedule_removal.si(job_obj.pk)).apply_async()
     return job_obj
 
 @shared_task
@@ -55,8 +68,10 @@ def retrieve_posts_from_links(urls, job_id):
     for index, url in enumerate(urls):
         parsed_feed, posts, error = retrieve_posts_from_url(url, feed, job_id)
         if error:
+            logger.exception(error)
             continue
         if not posts:
+            logger.warning('no new post in `%s`', url)
             continue
 
         chain_tasks = []
@@ -113,7 +128,7 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
                     continue
                 categories = post_dict.categories
                 del post_dict.categories
-                post, created = models.Post.objects.get_or_create(defaults={**post_dict.__dict__, "job_id":job_id}, feed=db_feed, link=post_dict.link)
+                post, created = models.Post.objects.get_or_create(defaults=post_dict.__dict__, feed=db_feed, link=post_dict.link)
                 if not created:
                     continue
                 db_feed.earliest_item_pubdate = min(db_feed.earliest_item_pubdate or post.pubdate, post.pubdate)
@@ -139,8 +154,7 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
 def retrieve_full_text(self, ftjob_pk):
     fulltext_job = models.FulltextJob.objects.get(pk=ftjob_pk)
     try:
-        if not fulltext_job.post.is_full_text:
-            fulltext_job.post.description, fulltext_job.post.content_type = h4f.get_full_text(fulltext_job.post.link)
+        fulltext_job.post.description, fulltext_job.post.content_type = h4f.get_full_text(fulltext_job.post.link)
         fulltext_job.status = models.FullTextState.RETRIEVED
         fulltext_job.error_str = ""
         fulltext_job.post.is_full_text = True

@@ -77,6 +77,18 @@ class ErrorResp(Response):
 
 
 # Create your views here.
+@extend_schema_view(
+    partial_update=extend_schema(
+        description="Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.",
+        summary="Update a Post in a Feed",
+        responses={
+            200: JobSerializer,
+            404: OpenApiResponse(H4FError, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
+        },
+        tags=["Feeds"],
+        request=None,
+    ),
+)
 class PostView(
     mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
 ):
@@ -99,7 +111,7 @@ class PostView(
             label="Filter by the content in a posts description. Will search for descriptions that contain the value entered.",
             lookup_expr="search",
         )
-        job_id = Filter(label="Filter the Post by Job ID the Post was downloaded in.")
+        job_id = Filter(label="Filter the Post by Job ID the Post was downloaded in.", field_name="fulltext_jobs__job_id")
 
     def get_queryset(self):
         return Post.objects.filter(feed_id=self.kwargs.get("feed_id"))
@@ -168,6 +180,19 @@ class PostView(
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
+    
+
+    def partial_update(self, request, *args, **kwargs):
+        post: Post = self.get_object()
+        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
+        job_resp = {
+            "datetime_added": post.datetime_added,
+            "job_state": job_obj.state,
+            "post_id": post.id,
+            "feed_id": post.feed.id,
+            "id": job_obj.id,
+        }
+        return Response(job_resp)
 
 
 class FeedView(viewsets.ModelViewSet):
@@ -248,7 +273,8 @@ class FeedView(viewsets.ModelViewSet):
         request=None,
         description=textwrap.dedent(
             """
-        Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.
+        Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.\n\n
+        Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.
         """
         ),
         tags=open_api_tags,
