@@ -86,6 +86,7 @@ class ErrorResp(Response):
             404: OpenApiResponse(H4FError, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
         },
         tags=["Feeds"],
+        request=None,
     ),
 )
 class PostView(
