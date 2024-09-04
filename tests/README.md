@@ -20,7 +20,7 @@ pip3 install -r requirements.txt
 ### Check different feed formats
 
 ```shell
-python3 -m unittest tests/test_01_check_feed_types.py
+python3 -m unittest tests/test_01_add_feeds_check_ids.py
 ```
 
 This contains 12 feed types, both ATOM and RSS feeds, all in three formats; 1) html encoded, 2) decoded, 3) with cdata tags.
@@ -31,8 +31,6 @@ The test;
 2. adds the feeds
 3. checks the jobs for the added feeds, until all are successful
 4. checks each feed id
-5. checks the posts have been indexed for one of the blogs
-6. deletes all the blogs
 
 Note, because we use a UUIDv5 ID (namespace `6c6e6448-04d4-42a3-9214-4f0f7d02694e`) to generate IDs we can hardcode the IDs. For;
 
