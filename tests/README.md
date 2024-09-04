@@ -39,7 +39,6 @@ Note, because we use a UUIDv5 ID (namespace `6c6e6448-04d4-42a3-9214-4f0f7d02694
 * posts: UUID generated from namespace and the value `<FEED_ID>+<POST_URL>+<POST_PUB_TIME>`
 	* e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`
 
-
 Note, if during development a test fails part way through, you can use the following script to clean 
 
 ## Manual Tests
