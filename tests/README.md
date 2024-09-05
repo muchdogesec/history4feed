@@ -37,9 +37,14 @@ Note, because we use a UUIDv5 ID (namespace `6c6e6448-04d4-42a3-9214-4f0f7d02694
 * blogs: UUID generated from namespace and the value `<URL OF BLOG>`
 	* e.g. `https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-encoded.xml` = `d1d96b71-c687-50db-9d2b-d0092d1d163a`
 * posts: UUID generated from namespace and the value `<FEED_ID>+<POST_URL>+<POST_PUB_TIME>`
-	* e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`
+	* e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`
+	* Note `<POST_PUB_TIME>` is reported in seconds, we generate the value used in UUID generation with sub-seconds (e.g. `2024-08-20T10:00:00Z` -> `2024-08-20T10:00:00.000000Z`)
 
-Note, if during development a test fails part way through, you can use the following script to clean 
+Note, you can clean up any old test data using this script which will delete ALL feeds (including those not included in test scripts);
+
+```shell
+python3 tests/delete_all_feeds.py
+```
 
 ## Manual Tests
 
