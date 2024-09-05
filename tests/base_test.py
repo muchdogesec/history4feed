@@ -73,6 +73,11 @@ class BaseTest(unittest.TestCase):
         self.posts = {
             "d1d96b71-c687-50db-9d2b-d0092d1d163a": [
                 {
+                    "id": "cfdb68b8-3d80-572d-9350-58baf57eabfb",
+                    "title": "Obstracts AI relationship generation test",
+                    "pubdate": "2024-08-23T08:00:00Z"
+                },
+                {
                     "id": "8f16d2be-7b06-5f3c-a851-9cce31b4fec8",
                     "title": "Update this post for testing updates to posts",
                     "pubdate": "2024-08-20T10:00:00Z"
