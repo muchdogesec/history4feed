@@ -20,8 +20,8 @@ from .utils import (
 
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import H4FError, PostSerializer, FeedSerializer, JobSerializer
-from .models import Post, Feed, Job
+from .serializers import FeedCreateSerializer, H4FError, PatchSerializer, PostSerializer, FeedSerializer, JobSerializer
+from .models import FulltextJob, Post, Feed, Job
 from rest_framework import (
     viewsets,
     request,
@@ -46,7 +46,7 @@ from django_filters.rest_framework import (
     Filter,
     BaseCSVFilter,
 )
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Subquery, OuterRef
 from datetime import datetime
 import textwrap
 
@@ -86,7 +86,7 @@ class ErrorResp(Response):
             404: OpenApiResponse(H4FError, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
         },
         tags=["Feeds"],
-        request=None,
+        request=PatchSerializer,
     ),
 )
 class PostView(
@@ -114,7 +114,8 @@ class PostView(
         job_id = Filter(label="Filter the Post by Job ID the Post was downloaded in.", field_name="fulltext_jobs__job_id")
 
     def get_queryset(self):
-        return Post.objects.filter(feed_id=self.kwargs.get("feed_id"))
+        subquery = FulltextJob.objects.filter(post_id=OuterRef('pk')).order_by('-job__run_datetime').values('job__profile_id')[:1]
+        return Post.objects.filter(feed_id=self.kwargs.get("feed_id")).annotate(profile_id=Subquery(subquery))
 
     @extend_schema(
         parameters=[FEED_ID_PARAM],
@@ -183,8 +184,10 @@ class PostView(
     
 
     def partial_update(self, request, *args, **kwargs):
+        s = PatchSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
         post: Post = self.get_object()
-        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
+        job_obj = task_helper.new_patch_posts_job(post.feed, [post], s.data['profile_id'])
         job_resp = {
             "datetime_added": post.datetime_added,
             "job_state": job_obj.state,
@@ -247,7 +250,7 @@ class FeedView(viewsets.ModelViewSet):
         ),
         tags=open_api_tags,
         responses={
-            200: FeedSerializer,
+            200: FeedCreateSerializer,
             400: OpenApiResponse(H4FError, "Bad request", examples=[HTTP400_EXAMPLE]),
             406: OpenApiResponse(H4FError, "Invalid feed url", examples=[OpenApiExample(name="http-406", value={"detail": "invalid feed url", "code": 406})]),
         },
@@ -261,7 +264,7 @@ class FeedView(viewsets.ModelViewSet):
             return ErrorResp(406, "Invalid feed url", details={"error": str(e)})
         s.run_validation(feed)
         feed_obj: Feed = s.create(validated_data=feed)
-        job_obj = task_helper.new_job(feed_obj)
+        job_obj = task_helper.new_job(feed_obj, s.data['profile_id'])
         feed["job_state"] = job_obj.state
         feed["id"] = feed_obj.id
         feed["job_id"] = job_obj.id
@@ -270,7 +273,7 @@ class FeedView(viewsets.ModelViewSet):
     @extend_schema(
         parameters=[FEED_ID_PARAM],
         summary="Update a Feed",
-        request=None,
+        request=PatchSerializer,
         description=textwrap.dedent(
             """
         Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.\n\n
@@ -284,8 +287,10 @@ class FeedView(viewsets.ModelViewSet):
         },
     )
     def partial_update(self, request, *args, **kwargs):
+        s = PatchSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
         feed_obj: Feed = self.get_object()
-        job_obj = task_helper.new_job(feed_obj)
+        job_obj = task_helper.new_job(feed_obj, s.data['profile_id'])
         feed = {
             "datetime_added": feed_obj.datetime_added,
             "job_state": job_obj.state,
