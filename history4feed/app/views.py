@@ -282,7 +282,7 @@ class FeedView(viewsets.ModelViewSet):
         ),
         tags=open_api_tags,
         responses={
-            200: FeedSerializer,
+            200: FeedCreateSerializer,
             400: OpenApiResponse(H4FError, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
     )
