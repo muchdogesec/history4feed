@@ -30,6 +30,7 @@ from rest_framework import (
     decorators,
     renderers,
     pagination,
+    status,
 )
 from django.http import HttpResponse
 from ..h4fscripts import h4f, task_helper, build_rss
@@ -250,7 +251,7 @@ class FeedView(viewsets.ModelViewSet):
         ),
         tags=open_api_tags,
         responses={
-            200: FeedCreateSerializer,
+            201: FeedCreateSerializer,
             400: OpenApiResponse(H4FError, "Bad request", examples=[HTTP400_EXAMPLE]),
             406: OpenApiResponse(H4FError, "Invalid feed url", examples=[OpenApiExample(name="http-406", value={"detail": "invalid feed url", "code": 406})]),
         },
@@ -268,7 +269,7 @@ class FeedView(viewsets.ModelViewSet):
         feed["job_state"] = job_obj.state
         feed["id"] = feed_obj.id
         feed["job_id"] = job_obj.id
-        return Response(feed)
+        return Response(feed, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         parameters=[FEED_ID_PARAM],
