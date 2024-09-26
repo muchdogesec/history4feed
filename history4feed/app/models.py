@@ -76,7 +76,7 @@ class Job(models.Model):
         ft_job: FulltextJob = None
         for ft_job in self.fulltext_jobs.all():
             retval[ft_job.status] = retval.get(ft_job.status, [])
-            retval[ft_job.status].append(ft_job.link)
+            retval[ft_job.status].append(dict(url=ft_job.link, id=ft_job.post_id))
         return retval
 
 

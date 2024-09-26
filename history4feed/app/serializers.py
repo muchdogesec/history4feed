@@ -24,11 +24,15 @@ class PostSerializer(serializers.ModelSerializer):
 class PatchSerializer(serializers.Serializer):
     profile_id = serializers.UUIDField()
 
+
 class JobUrlStatusSerializer(serializers.Serializer):
-    retrieved = serializers.ListField(child=serializers.CharField(), allow_null=True, default=[])
-    skipped = serializers.ListField(child=serializers.CharField(), allow_null=True, default=[])
-    failed = serializers.ListField(child=serializers.CharField(), allow_null=True, default=[])
-    retrieving = serializers.ListField(child=serializers.CharField(), allow_null=True, default=[])
+    class joburlstatus(serializers.Serializer):
+        url = serializers.URLField()
+        id = serializers.UUIDField()
+    retrieved = joburlstatus(many=True, default=[])
+    skipped = joburlstatus(many=True, default=[])
+    failed = joburlstatus(many=True, default=[])
+    retrieving = joburlstatus(many=True, default=[])
 
 class JobSerializer(serializers.ModelSerializer):
     count_of_items = serializers.IntegerField(read_only=True)
