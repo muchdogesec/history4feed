@@ -69,7 +69,7 @@ class Job(models.Model):
     latest_item_requested = models.DateTimeField(null=True, help_text="shows the latest time for posts requested")
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
     info = models.CharField(max_length=FEED_DESCRIPTION_MAX_LENGTH, help_text="contains a useful summary of the job (e.g. number of posts retrieved, errors logged)")
-    profile_id = models.UUIDField(null=True)
+    profile_id = models.UUIDField(null=True, blank=True)
 
     def urls(self):
         retval = {}

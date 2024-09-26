@@ -22,7 +22,7 @@ class PostSerializer(serializers.ModelSerializer):
         # fields = '__all__'
 
 class PatchSerializer(serializers.Serializer):
-    profile_id = serializers.UUIDField()
+    profile_id = serializers.UUIDField(required=False, default=None)
 
 
 class JobUrlStatusSerializer(serializers.Serializer):
