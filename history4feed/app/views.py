@@ -80,7 +80,12 @@ class ErrorResp(Response):
 # Create your views here.
 @extend_schema_view(
     partial_update=extend_schema(
-        description="Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.",
+        description=textwrap.dedent(
+            """Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.\n\n
+            `profile_id` is an optional field that can be passed in the request body and accepts a UUIDv4. You should not pass it. We (DOGESEC) use this property for integration with Obstracts.\n\n
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+            """
+        ),
         summary="Update a Post in a Feed",
         responses={
             200: JobSerializer,
@@ -247,7 +252,8 @@ class FeedView(viewsets.ModelViewSet):
         Use this endpoint to create to a new feed. The `url` value used should be a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned.\n\n
         If the  `url` is already associated with an existing Feed, using it via this endpoint will trigger an update request for the blog. If you want to add the `url` with new settings, first delete the feed it is associated with.\n\n
         `include_remote_blogs` is a boolean setting. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to `false`.\n\n
-        `profile_id` is an optional field that accepts a UUIDv4. You should not pass it. We (DOGESEC) use this property for integration with Obstracts.
+        `profile_id` is an optional field that can be passed in the request body and accepts a UUIDv4. You should not pass it. We (DOGESEC) use this property for integration with Obstracts.\n\n
+        The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
         """
         ),
         tags=open_api_tags,
@@ -279,7 +285,9 @@ class FeedView(viewsets.ModelViewSet):
         description=textwrap.dedent(
             """
         Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.\n\n
-        Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.
+        Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.\n\n
+        `profile_id` is an optional field that can be passed in the request body and accepts a UUIDv4. You should not pass it. We (DOGESEC) use this property for integration with Obstracts.\n\n
+        The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
         """
         ),
         tags=open_api_tags,
