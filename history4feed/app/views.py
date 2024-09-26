@@ -379,10 +379,10 @@ class JobView(
 
     class filterset_class(FilterSet):
         feed_id = Filter(
-            label="Filter Jobs by the ID of the Feed they belong to. You can search for Feed IDs using the GET Feeds endpoints."
+            label="Filter Jobs by the ID of the Feed they belong to. You can search for Feed IDs using the GET Feeds endpoints. Note a Feed can have multiple jobs associated with it where a PATCH request has been run to update the Feed."
         )
         state = Filter(label="Filter by the status of a Job")
-        post_id = Filter(label="show only the jobs that links to a post in a feed.", field_name="fulltext_jobs__post_id")
+        post_id = Filter(label="Filter Jobs by the ID of the Post they belong to. You can search for Post IDs using the GET Posts endpoint. Note a Post can have multiple jobs associated with it where a PATCH request has been run to update a Feed or a Post.", field_name="fulltext_jobs__post_id")
 
     def get_queryset(self):
         return Job.objects.all().annotate(count_of_items=Count("fulltext_jobs"))
