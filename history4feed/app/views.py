@@ -20,8 +20,8 @@ from .utils import (
 
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import H4FError, PostSerializer, FeedSerializer, JobSerializer
-from .models import Post, Feed, Job
+from .serializers import FeedCreateSerializer, H4FError, PatchSerializer, PostSerializer, FeedSerializer, JobSerializer
+from .models import FulltextJob, Post, Feed, Job
 from rest_framework import (
     viewsets,
     request,
@@ -30,6 +30,7 @@ from rest_framework import (
     decorators,
     renderers,
     pagination,
+    status,
 )
 from django.http import HttpResponse
 from ..h4fscripts import h4f, task_helper, build_rss
@@ -46,7 +47,7 @@ from django_filters.rest_framework import (
     Filter,
     BaseCSVFilter,
 )
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Subquery, OuterRef
 from datetime import datetime
 import textwrap
 
@@ -79,14 +80,19 @@ class ErrorResp(Response):
 # Create your views here.
 @extend_schema_view(
     partial_update=extend_schema(
-        description="Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.",
+        description=textwrap.dedent(
+            """Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.\n\n
+            `profile_id` is an optional field that can be passed in the request body and accepts a UUIDv4. You should not pass it. We (DOGESEC) use this property for integration with Obstracts.\n\n
+            The response will return the Job information (`job_id`) responsible for getting the requested data. You can track the Job using the GET Jobs by ID endpoint.
+            """
+        ),
         summary="Update a Post in a Feed",
         responses={
             200: JobSerializer,
             404: OpenApiResponse(H4FError, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
         },
         tags=["Feeds"],
-        request=None,
+        request=PatchSerializer,
     ),
 )
 class PostView(
@@ -114,7 +120,8 @@ class PostView(
         job_id = Filter(label="Filter the Post by Job ID the Post was downloaded in.", field_name="fulltext_jobs__job_id")
 
     def get_queryset(self):
-        return Post.objects.filter(feed_id=self.kwargs.get("feed_id"))
+        subquery = FulltextJob.objects.filter(post_id=OuterRef('pk')).order_by('-job__run_datetime').values('job__profile_id')[:1]
+        return Post.objects.filter(feed_id=self.kwargs.get("feed_id")).annotate(profile_id=Subquery(subquery))
 
     @extend_schema(
         parameters=[FEED_ID_PARAM],
@@ -183,8 +190,10 @@ class PostView(
     
 
     def partial_update(self, request, *args, **kwargs):
+        s = PatchSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
         post: Post = self.get_object()
-        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
+        job_obj = task_helper.new_patch_posts_job(post.feed, [post], s.data['profile_id'])
         job_resp = {
             "datetime_added": post.datetime_added,
             "job_state": job_obj.state,
@@ -242,12 +251,14 @@ class FeedView(viewsets.ModelViewSet):
             """
         Use this endpoint to create to a new feed. The `url` value used should be a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned.\n\n
         If the  `url` is already associated with an existing Feed, using it via this endpoint will trigger an update request for the blog. If you want to add the `url` with new settings, first delete the feed it is associated with.\n\n
-        `include_remote_blogs` is a boolean setting. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to `false`.
+        `include_remote_blogs` is a boolean setting. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to `false`.\n\n
+        `profile_id` is an optional field that can be passed in the request body and accepts a UUIDv4. You should not pass it. We (DOGESEC) use this property for integration with Obstracts.\n\n
+        The response will return the Job information (`job_id`) responsible for getting the requested data. You can track the Job using the GET Jobs by ID endpoint.
         """
         ),
         tags=open_api_tags,
         responses={
-            200: FeedSerializer,
+            201: FeedCreateSerializer,
             400: OpenApiResponse(H4FError, "Bad request", examples=[HTTP400_EXAMPLE]),
             406: OpenApiResponse(H4FError, "Invalid feed url", examples=[OpenApiExample(name="http-406", value={"detail": "invalid feed url", "code": 406})]),
         },
@@ -255,37 +266,42 @@ class FeedView(viewsets.ModelViewSet):
     def create(self, request: request.Request, **kwargs):
         s = self.serializer_class(data=request.data)
         s.is_valid(raise_exception=True)
+        profile_id = request.data.get('profile_id')
         try:
             feed = h4f.parse_feed_from_url(s.data["url"])
         except Exception as e:
             return ErrorResp(406, "Invalid feed url", details={"error": str(e)})
-        s.run_validation(feed)
+        s.run_validation({**feed, 'profile_id': profile_id})
         feed_obj: Feed = s.create(validated_data=feed)
-        job_obj = task_helper.new_job(feed_obj)
+        job_obj = task_helper.new_job(feed_obj, profile_id)
         feed["job_state"] = job_obj.state
         feed["id"] = feed_obj.id
         feed["job_id"] = job_obj.id
-        return Response(feed)
+        return Response(feed, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         parameters=[FEED_ID_PARAM],
         summary="Update a Feed",
-        request=None,
+        request=PatchSerializer,
         description=textwrap.dedent(
             """
         Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.\n\n
-        Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.
+        Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.\n\n
+        `profile_id` is an optional field that can be passed in the request body and accepts a UUIDv4. You should not pass it. We (DOGESEC) use this property for integration with Obstracts.\n\n
+        The response will return the Job information (`job_id`) responsible for getting the requested data. You can track the Job using the GET Jobs by ID endpoint.
         """
         ),
         tags=open_api_tags,
         responses={
-            200: FeedSerializer,
+            200: FeedCreateSerializer,
             400: OpenApiResponse(H4FError, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
     )
     def partial_update(self, request, *args, **kwargs):
+        s = PatchSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
         feed_obj: Feed = self.get_object()
-        job_obj = task_helper.new_job(feed_obj)
+        job_obj = task_helper.new_job(feed_obj, s.data['profile_id'])
         feed = {
             "datetime_added": feed_obj.datetime_added,
             "job_state": job_obj.state,
@@ -364,9 +380,10 @@ class JobView(
 
     class filterset_class(FilterSet):
         feed_id = Filter(
-            label="Filter Jobs by the ID of the Feed they belong to. You can search for Feed IDs using the GET Feeds endpoints."
+            label="Filter Jobs by the ID of the Feed they belong to. You can search for Feed IDs using the GET Feeds endpoints. Note a Feed can have multiple jobs associated with it where a PATCH request has been run to update the Feed."
         )
         state = Filter(label="Filter by the status of a Job")
+        post_id = Filter(label="Filter Jobs by the ID of the Post they belong to. You can search for Post IDs using the GET Posts endpoint. Note a Post can have multiple jobs associated with it where a PATCH request has been run to update a Feed or a Post.", field_name="fulltext_jobs__post_id")
 
     def get_queryset(self):
         return Job.objects.all().annotate(count_of_items=Count("fulltext_jobs"))
