@@ -3,7 +3,7 @@ from .models import Feed, Post, Job
 
 class FeedSerializer(serializers.ModelSerializer):
     count_of_posts = serializers.IntegerField(source='get_post_count', read_only=True, help_text="Number of posts in feed")
-    profile_id = serializers.UUIDField(write_only=True, required=False)
+    profile_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
     class Meta:
         model = Feed
         fields = '__all__'
