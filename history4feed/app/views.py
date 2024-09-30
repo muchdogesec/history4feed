@@ -266,13 +266,14 @@ class FeedView(viewsets.ModelViewSet):
     def create(self, request: request.Request, **kwargs):
         s = self.serializer_class(data=request.data)
         s.is_valid(raise_exception=True)
+        profile_id = request.data.get('profile_id')
         try:
             feed = h4f.parse_feed_from_url(s.data["url"])
         except Exception as e:
             return ErrorResp(406, "Invalid feed url", details={"error": str(e)})
-        s.run_validation(feed)
+        s.run_validation({**feed, 'profile_id': profile_id})
         feed_obj: Feed = s.create(validated_data=feed)
-        job_obj = task_helper.new_job(feed_obj, s.data['profile_id'])
+        job_obj = task_helper.new_job(feed_obj, profile_id)
         feed["job_state"] = job_obj.state
         feed["id"] = feed_obj.id
         feed["job_id"] = job_obj.id
