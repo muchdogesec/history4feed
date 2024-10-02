@@ -82,7 +82,8 @@ class ErrorResp(Response):
 @extend_schema_view(
     partial_update=extend_schema(
         description=textwrap.dedent(
-            """Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.\n\n
+            """
+            Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.\n\n
             `profile_id` is an optional field that can be passed in the request body and accepts a UUIDv4. You should not pass it. We (DOGESEC) use this property for integration with Obstracts.\n\n
             The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
             """
