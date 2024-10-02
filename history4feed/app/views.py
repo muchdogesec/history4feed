@@ -20,7 +20,7 @@ from .utils import (
 
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import FeedCreateSerializer, H4FError, PatchSerializer, PostSerializer, FeedSerializer, JobSerializer
+from .serializers import FeedCreateSerializer, H4FError, PatchSerializer, PostPatchRespSerializer, PostSerializer, FeedSerializer, JobSerializer
 from .models import FulltextJob, Post, Feed, Job
 from rest_framework import (
     viewsets,
@@ -46,6 +46,7 @@ from django_filters.rest_framework import (
     FilterSet,
     Filter,
     BaseCSVFilter,
+    UUIDFilter,
 )
 from django.db.models import Count, Q, Subquery, OuterRef
 from datetime import datetime
@@ -88,7 +89,7 @@ class ErrorResp(Response):
         ),
         summary="Update a Post in a Feed",
         responses={
-            200: JobSerializer,
+            201: PostPatchRespSerializer,
             404: OpenApiResponse(H4FError, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
         },
         tags=["Feeds"],
@@ -194,14 +195,9 @@ class PostView(
         s.is_valid(raise_exception=True)
         post: Post = self.get_object()
         job_obj = task_helper.new_patch_posts_job(post.feed, [post], s.data['profile_id'])
-        job_resp = {
-            "datetime_added": post.datetime_added,
-            "job_state": job_obj.state,
-            "post_id": post.id,
-            "feed_id": post.feed.id,
-            "id": job_obj.id,
-        }
-        return Response(job_resp)
+        job_resp = JobSerializer(job_obj).data.copy()
+        job_resp.update(post_id=post.id)
+        return Response(job_resp, status=status.HTTP_201_CREATED)
 
 
 class FeedView(viewsets.ModelViewSet):
@@ -274,9 +270,12 @@ class FeedView(viewsets.ModelViewSet):
         s.run_validation({**feed, 'profile_id': profile_id})
         feed_obj: Feed = s.create(validated_data=feed)
         job_obj = task_helper.new_job(feed_obj, profile_id)
-        feed["job_state"] = job_obj.state
-        feed["id"] = feed_obj.id
-        feed["job_id"] = job_obj.id
+
+        feed = self.serializer_class(feed_obj).data.copy()
+        feed.update(
+            job_state=job_obj.state,
+            job_id=job_obj.id,
+        )
         return Response(feed, status=status.HTTP_201_CREATED)
 
     @extend_schema(
@@ -293,7 +292,7 @@ class FeedView(viewsets.ModelViewSet):
         ),
         tags=open_api_tags,
         responses={
-            200: FeedCreateSerializer,
+            201: FeedCreateSerializer,
             400: OpenApiResponse(H4FError, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
     )
@@ -302,14 +301,13 @@ class FeedView(viewsets.ModelViewSet):
         s.is_valid(raise_exception=True)
         feed_obj: Feed = self.get_object()
         job_obj = task_helper.new_job(feed_obj, s.data['profile_id'])
-        feed = {
-            "datetime_added": feed_obj.datetime_added,
-            "job_state": job_obj.state,
-            "id": feed_obj.id,
-            "job_id": job_obj.id,
-            "title": feed_obj.title,
-        }
-        return Response(feed)
+        feed = self.serializer_class(feed_obj).data.copy()
+
+        feed.update(
+            job_state=job_obj.state,
+            job_id=job_obj.id,
+        )
+        return Response(feed, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         summary="Search for Feeds",
@@ -383,7 +381,7 @@ class JobView(
             label="Filter Jobs by the ID of the Feed they belong to. You can search for Feed IDs using the GET Feeds endpoints. Note a Feed can have multiple jobs associated with it where a PATCH request has been run to update the Feed."
         )
         state = Filter(label="Filter by the status of a Job")
-        post_id = Filter(label="Filter Jobs by the ID of the Post they belong to. You can search for Post IDs using the GET Posts endpoint. Note a Post can have multiple jobs associated with it where a PATCH request has been run to update a Feed or a Post.", field_name="fulltext_jobs__post_id")
+        post_id = UUIDFilter(label="Filter Jobs by the ID of the Post they belong to. You can search for Post IDs using the GET Posts endpoint. Note a Post can have multiple jobs associated with it where a PATCH request has been run to update a Feed or a Post.", field_name="fulltext_jobs__post_id")
 
     def get_queryset(self):
         return Job.objects.all().annotate(count_of_items=Count("fulltext_jobs"))
