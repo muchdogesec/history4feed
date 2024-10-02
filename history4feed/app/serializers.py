@@ -43,6 +43,9 @@ class JobSerializer(serializers.ModelSerializer):
         # fields = '__all__'
         exclude = ['feed']
 
+class PostPatchRespSerializer(JobSerializer):
+    post_id = serializers.UUIDField()
+
 
 class H4FError(serializers.Serializer):
     detail = serializers.CharField()
