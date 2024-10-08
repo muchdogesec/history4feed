@@ -20,7 +20,7 @@ from .utils import (
 
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import FeedCreateSerializer, H4FError, PatchSerializer, PostPatchRespSerializer, PostSerializer, FeedSerializer, JobSerializer
+from .serializers import FeedCreateSerializer, H4FError, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
 from .models import FulltextJob, Post, Feed, Job
 from rest_framework import (
     viewsets,
@@ -90,7 +90,7 @@ class ErrorResp(Response):
         ),
         summary="Update a Post in a Feed",
         responses={
-            201: PostPatchRespSerializer,
+            201: PostJobSerializer,
             404: OpenApiResponse(H4FError, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
         },
         tags=["Feeds"],
@@ -195,6 +195,28 @@ class PostView(
         s = PatchSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         post: Post = self.get_object()
+        job_obj = task_helper.new_patch_posts_job(post.feed, [post], s.data['profile_id'])
+        job_resp = JobSerializer(job_obj).data.copy()
+        job_resp.update(post_id=post.id)
+        return Response(job_resp, status=status.HTTP_201_CREATED)
+    
+    @extend_schema(
+        parameters=[FEED_ID_PARAM],
+        summary="Backfill a Post in a Feed",
+        responses={
+            201: PostJobSerializer,
+            404: OpenApiResponse(H4FError, "Feed does not exist", examples=[HTTP404_EXAMPLE]),
+        },
+        tags=["Feeds"],
+    )
+    def create(self, request, *args, feed_id=None, **kwargs):
+        feed_obj = get_object_or_404(Feed.objects, id=feed_id)
+        data = dict(**request.data, feed_id=feed_id, feed=feed_id)
+        s = PostSerializer(data=data)
+        s.is_valid(raise_exception=True)
+        s2 = PostCreateSerializer(data=data)
+        s2.is_valid(raise_exception=True)
+        post = s2.save()
         job_obj = task_helper.new_patch_posts_job(post.feed, [post], s.data['profile_id'])
         job_resp = JobSerializer(job_obj).data.copy()
         job_resp.update(post_id=post.id)

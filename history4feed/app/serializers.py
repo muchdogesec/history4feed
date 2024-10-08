@@ -1,5 +1,7 @@
-from rest_framework import serializers
-from .models import Feed, Post, Job
+from rest_framework import serializers, validators
+from .models import Category, Feed, Post, Job, normalize_url
+from django.db import models as django_models
+from django.utils.translation import gettext_lazy as _
 
 class FeedSerializer(serializers.ModelSerializer):
     count_of_posts = serializers.IntegerField(source='get_post_count', read_only=True, help_text="Number of posts in feed")
@@ -15,14 +17,37 @@ class FeedCreateSerializer(FeedSerializer):
     
 
 class PostSerializer(serializers.ModelSerializer):
-    profile_id = serializers.UUIDField()
+    profile_id = serializers.UUIDField(required=False, default=None)
+    # categories = serializers.ManyRelatedField()
     class Meta:
         model = Post
         exclude = ['feed']
-        # fields = '__all__'
+        read_only_fields = ["id", "datetime_updated", "datetime_added", "description", "is_full_text", "content_type"]
+        
+    
+    def run_validation(self, data=...):
+        if categories:= data.get('categories'):
+            data['categories'] = [Category.objects.get_or_create(name=name)[0].name for name in categories]
+        return super().run_validation(data)
+    
 
 class PatchSerializer(serializers.Serializer):
     profile_id = serializers.UUIDField(required=False, default=None)
+
+class PostCreateSerializer(PostSerializer):
+    # feed_id = serializers.UUIDField(source='feed')
+    link = serializers.URLField(validators=[normalize_url])
+    class Meta:
+        model = Post
+        fields = ["title", "link", "pubdate", "author", "categories", "feed"]
+        validators = [
+            validators.UniqueTogetherValidator(
+                queryset=Post.objects.all(),
+                fields=('feed', 'link'),
+                message='Link already exists in field.',
+            )
+        ]
+
 
 
 class JobUrlStatusSerializer(serializers.Serializer):
@@ -43,7 +68,7 @@ class JobSerializer(serializers.ModelSerializer):
         # fields = '__all__'
         exclude = ['feed']
 
-class PostPatchRespSerializer(JobSerializer):
+class PostJobSerializer(JobSerializer):
     post_id = serializers.UUIDField()
 
 

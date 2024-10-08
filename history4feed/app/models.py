@@ -4,8 +4,10 @@ from urllib.parse import urlparse
 import uuid
 from django.conf import settings
 from django.db import models
+from rest_framework import validators
 from uuid import uuid4
 from django.utils.text import slugify
+import hyperlink
 
 POST_DESCRIPTION_MAX_LENGTH = 2 * 1024 * 1024 # 2MiB
 FEED_DESCRIPTION_MAX_LENGTH = 10*1024 # 10KiB
@@ -32,6 +34,13 @@ class Category(models.Model):
 
 def stix_id(url):
     return uuid.uuid5(uuid.UUID(settings.HISTORY4FEED_NAMESPACE), url)
+
+def normalize_url(url):
+    try:
+        u = hyperlink.parse(url)
+        return u.normalize(url).to_text()
+    except Exception as e:
+        raise validators.ValidationError(f"normalize_url failed for `{url}`: {e}")
     
 
 class Feed(models.Model):
@@ -42,7 +51,7 @@ class Feed(models.Model):
         The URL of the RSS or ATOM feed
 
         Note this will be validated to ensure the feed is in the correct format.
-    """))
+    """), validators=[normalize_url])
     earliest_item_pubdate = models.DateTimeField(null=True, help_text="pubdate of earliest post")
     latest_item_pubdate = models.DateTimeField(null=True, help_text="pubdate of latest post")
     datetime_added = models.DateTimeField(auto_now_add=True, editable=False, help_text="date feed entry was added to database")
@@ -92,17 +101,17 @@ class Post(models.Model):
     datetime_updated = models.DateTimeField(auto_now=True)
     title = models.CharField(max_length=1000, help_text="found in the <item> element of feed output")
     description = models.CharField(max_length=POST_DESCRIPTION_MAX_LENGTH, blank=True, help_text="found in the <item> element of feed output")
-    link = models.URLField(max_length=1000, help_text="link to full article. found in the <item> element of feed output")
+    link = models.URLField(max_length=1000, help_text="link to full article. found in the <item> element of feed output", validators=[normalize_url])
     pubdate = models.DateTimeField(help_text="date of publication.")
     author = models.CharField(max_length=1000, help_text="author of the post")
-    categories = models.ManyToManyField(Category, related_name="posts", help_text="categories of the post")
+    categories = models.ManyToManyField(Category, related_name="posts", help_text="categories of the post", blank=True)
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE, related_name="posts", help_text="feed id this item belongs too")
     is_full_text = models.BooleanField(default=False, help_text="if full text has been retrieved")
     content_type = models.CharField(default="plain/text", max_length=200, help_text="content type of the description")
 
     class  Meta:
         constraints = [
-            models.UniqueConstraint(fields=["link", "feed"], name="unique_link_by_field"),
+            models.UniqueConstraint(fields=["link", "feed"], name="unique_link_by_feed"),
         ]
 
     def add_categories(self, categories):
