@@ -48,6 +48,12 @@ python3 -m unittest tests/test_02_add_external_feeds.py
 
 Tests a range of feed formats and URLs.
 
+### Test manually add a post
+
+```shell
+python3 -m unittest tests/test_03_manually_add_post.py
+```
+
 ### Clean up
 
 Note, you can clean up any old test data using this script which will delete ALL feeds (including those not included in test scripts);
