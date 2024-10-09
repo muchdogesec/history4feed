@@ -1,5 +1,8 @@
 import unittest
+import requests
+import time
 
+# BaseTest class with feeds and posts definitions
 class BaseTest(unittest.TestCase):
     def setUp(self):
         # Define the base URL for the API requests
@@ -66,12 +69,17 @@ class BaseTest(unittest.TestCase):
                 "id": "220ae197-f66f-56b3-a17a-cbfc6dc9661a",
                 "description": "ATOM -- Contains decoded html inside CDATA tags -- PARTIAL CONTENT ONLY",
                 "feed_type": "atom"
-            }
+            },
         }
 
         # Posts corresponding to feed IDs
         self.posts = {
             "d1d96b71-c687-50db-9d2b-d0092d1d163a": [
+                {
+                    "id": "84a8ff1c-c463-5a97-b0c4-93daf7102b5f",
+                    "title": "Obstracts AI relationship generation test 2",
+                    "pubdate": "2024-09-01T08:00:00Z"
+                },
                 {
                     "id": "cfdb68b8-3d80-572d-9350-58baf57eabfb",
                     "title": "Obstracts AI relationship generation test",
@@ -99,3 +107,90 @@ class BaseTest(unittest.TestCase):
                 }
             ]
         }
+
+# TestFeedProcessing class inheriting from BaseTest
+class TestFeedProcessing(BaseTest):
+
+    def delete_existing_feeds(self):
+        """Deletes only the feeds defined in BaseTest to ensure a clean state."""
+        print("Starting deletion of existing feeds...")
+        for feed_id in [details['id'] for details in self.feeds.values()]:
+            url = f"{self.base_url}{feed_id}/"
+            while True:
+                response = requests.delete(url)
+                print(f"DELETE {url} - Status Code: {response.status_code}")
+                if response.status_code == 404:
+                    print(f"Feed ID {feed_id} already deleted or not found.")
+                    break
+                elif response.status_code == 204:
+                    print(f"Feed ID {feed_id} deleted successfully.")
+                    break
+                else:
+                    print(f"Unexpected status code {response.status_code} when deleting feed ID {feed_id}.")
+                    break
+
+    def setUp(self):
+        """Ensures that the DELETE operation runs before any test starts."""
+        super().setUp()
+        self.delete_existing_feeds()
+
+    def check_job_status(self, job_id, max_retries=5, delay=30):
+        """Check the job status until success or retry limit is reached."""
+        job_url = f"http://localhost:8002/api/v1/jobs/{job_id}/"
+        print(f"Checking job status for Job ID: {job_id}")
+        for attempt in range(max_retries):
+            response = requests.get(job_url, headers={"Accept": "application/json"})
+            print(f"GET {job_url} - Status Code: {response.status_code} - Attempt {attempt + 1}/{max_retries}")
+            self.assertEqual(response.status_code, 200, f"Request to {job_url} failed with status code {response.status_code}")
+            data = response.json()
+            state = data.get("state")
+            print(f"Job ID {job_id} - State: {state}")
+            if state == "success":
+                print(f"Job ID {job_id} reached success state.")
+                return True
+            time.sleep(delay)  # Wait before the next check
+        print(f"Job ID {job_id} did not reach success state after {max_retries} attempts.")
+        return False
+
+    def test_post_feed_urls_and_check_jobs(self):
+        """Tests adding feeds one by one, waits for each job to succeed before adding the next, and verifies post retrieval."""
+
+        # Step 1: Post each feed and wait for the job to succeed before moving to the next
+        for feed_url, feed_details in self.feeds.items():
+            with self.subTest(feed_url=feed_url):
+                # Post the feed
+                response = requests.post(
+                    self.base_url,
+                    json={
+                        "url": feed_url,
+                        "include_remote_blogs": False
+                    },
+                    headers={"Accept": "application/json"}  # Ensure the server responds with JSON
+                )
+                print(f"POST {self.base_url} - Feed URL: {feed_url} - Status Code: {response.status_code}")
+                self.assertEqual(response.status_code, 201, f"Request to {self.base_url} failed with status code {response.status_code}")
+                
+                # Collect the job ID
+                data = response.json()
+                job_id = data.get("job_id")
+                print(f"Job ID {job_id} received for Feed URL: {feed_url}")
+                self.assertIsNotNone(job_id, f"Job ID not returned for URL {feed_url}")
+
+                # Step 2: Wait for job to succeed (retry 5 times with 30 seconds delay)
+                job_successful = self.check_job_status(job_id)
+                self.assertTrue(job_successful, f"Job ID {job_id} for URL {feed_url} did not reach 'success' state after 5 retries")
+
+                # Step 3: Verify that each post can be retrieved with a 200 OK response
+                if feed_details["id"] in self.posts:
+                    print(f"Verifying retrieval of posts for feed: {feed_url}")
+                    for post in self.posts[feed_details["id"]]:
+                        post_url = f"http://localhost:8002/api/v1/feeds/{feed_details['id']}/posts/{post['id']}/"
+                        response = requests.get(post_url, headers={"Accept": "application/json"})
+                        print(f"GET {post_url} - Status Code: {response.status_code}")
+                        self.assertEqual(response.status_code, 200, f"Request to {post_url} failed with status code {response.status_code}")
+                else:
+                    print(f"No posts defined for feed: {feed_url}, skipping post retrieval verification.")
+
+# To run the tests
+if __name__ == '__main__':
+    unittest.main()

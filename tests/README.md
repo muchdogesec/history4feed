@@ -20,7 +20,7 @@ pip3 install -r requirements.txt
 ### Check different feed formats
 
 ```shell
-python3 -m unittest tests/test_01_add_feeds_check_ids.py
+python3 -m unittest tests/test_01_add_fakeblog123_feeds.py
 ```
 
 This contains 12 feed types, both ATOM and RSS feeds, all in three formats; 1) html encoded, 2) decoded, 3) with cdata tags.
@@ -39,6 +39,16 @@ Note, because we use a UUIDv5 ID (namespace `6c6e6448-04d4-42a3-9214-4f0f7d02694
 * posts: UUID generated from namespace and the value `<FEED_ID>+<POST_URL>+<POST_PUB_TIME>`
 	* e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`
 	* Note `<POST_PUB_TIME>` is reported in seconds, we generate the value used in UUID generation with sub-seconds (e.g. `2024-08-20T10:00:00Z` -> `2024-08-20T10:00:00.000000Z`)
+
+### Test 3rd party blog
+
+```shell
+python3 -m unittest tests/test_02_add_external_feeds.py
+```
+
+Tests a range of feed formats and URLs.
+
+### Clean up
 
 Note, you can clean up any old test data using this script which will delete ALL feeds (including those not included in test scripts);
 
