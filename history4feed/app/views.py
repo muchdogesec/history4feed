@@ -231,7 +231,7 @@ class PostView(
         s.is_valid(raise_exception=True)
         s2 = PostCreateSerializer(data=data)
         s2.is_valid(raise_exception=True)
-        post = s2.save()
+        post = s2.save(added_manually=True)
         job_obj = task_helper.new_patch_posts_job(post.feed, [post], s.data['profile_id'])
         job_resp = JobSerializer(job_obj).data.copy()
         job_resp.update(post_id=post.id)
@@ -308,7 +308,6 @@ class FeedView(viewsets.ModelViewSet):
             return ErrorResp(406, "Invalid feed url", details={"error": str(e)})
         s.run_validation({**feed, 'profile_id': profile_id})
         feed_obj: Feed = s.create(validated_data=feed)
-        print(f"{s.data=}, {s.validated_data=}")
         job_obj = task_helper.new_job(feed_obj, profile_id, s.data.get('include_remote_blogs', False))
 
         feed = self.serializer_class(feed_obj).data.copy()

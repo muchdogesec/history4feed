@@ -107,6 +107,7 @@ class Post(models.Model):
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE, related_name="posts", help_text="feed id this item belongs too")
     is_full_text = models.BooleanField(default=False, help_text="if full text has been retrieved")
     content_type = models.CharField(default="plain/text", max_length=200, help_text="content type of the description")
+    added_manually = models.BooleanField(default=False)
 
     class  Meta:
         constraints = [
