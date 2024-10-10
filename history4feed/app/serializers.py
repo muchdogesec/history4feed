@@ -6,10 +6,16 @@ from django.utils.translation import gettext_lazy as _
 class FeedSerializer(serializers.ModelSerializer):
     count_of_posts = serializers.IntegerField(source='get_post_count', read_only=True, help_text="Number of posts in feed")
     profile_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    include_remote_blogs = serializers.BooleanField(write_only=True, default=False)
     class Meta:
         model = Feed
         fields = '__all__'
         read_only_fields = ['id', 'title', 'description', 'earliest_item_pubdate', 'latest_item_pubdate', 'datetime_added']
+
+    def create(self, validated_data: dict):
+        validated_data = validated_data.copy()
+        validated_data.pop('include_remote_blogs', None)
+        return super().create(validated_data)
 
 class FeedCreateSerializer(FeedSerializer):
     job_id = serializers.UUIDField(read_only=True, help_text="only returns with POST /feeds/")
