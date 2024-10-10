@@ -75,6 +75,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='post',
-            constraint=models.UniqueConstraint(fields=('link', 'feed'), name='unique_link_by_field'),
+            constraint=models.UniqueConstraint(fields=('link', 'feed'), name='unique_link_by_feed'),
         ),
     ]

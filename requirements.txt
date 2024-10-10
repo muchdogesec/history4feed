@@ -47,3 +47,4 @@ vine==5.1.0; python_version >= '3.6'
 wcwidth==0.2.13
 fake-useragent==1.5.1
 whitenoise==6.7.0
+hyperlink==21.0.0

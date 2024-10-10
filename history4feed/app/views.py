@@ -20,7 +20,7 @@ from .utils import (
 
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import FeedCreateSerializer, H4FError, PatchSerializer, PostPatchRespSerializer, PostSerializer, FeedSerializer, JobSerializer
+from .serializers import FeedCreateSerializer, H4FError, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
 from .models import FulltextJob, Post, Feed, Job
 from rest_framework import (
     viewsets,
@@ -84,13 +84,14 @@ class ErrorResp(Response):
         description=textwrap.dedent(
             """
             Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.\n\n
-            `profile_id` is an optional field that can be passed in the request body and accepts a UUIDv4. You should not pass it. We (DOGESEC) use this property for integration with Obstracts.\n\n
+            The following key/values are accepted in the body of the request:\n\n        
+            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
             The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
             """
         ),
         summary="Update a Post in a Feed",
         responses={
-            201: PostPatchRespSerializer,
+            201: PostJobSerializer,
             404: OpenApiResponse(H4FError, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
         },
         tags=["Feeds"],
@@ -199,6 +200,42 @@ class PostView(
         job_resp = JobSerializer(job_obj).data.copy()
         job_resp.update(post_id=post.id)
         return Response(job_resp, status=status.HTTP_201_CREATED)
+    
+    @extend_schema(
+        parameters=[FEED_ID_PARAM],
+        summary="Backfill a Post in a Feed",
+        description=textwrap.dedent(
+            """
+            This endpoint allows you to add Posts manually to a Feed. This endpoint is designed to ingest posts that are not identified by the Wayback Machine (used by the POST Feed endpoint during ingestion). If the feed you want to add a post to does not already exist, you should first add it using the POST Feed endpoint.\n\n
+            The following key/values are accepted in the body of the request:\n\n
+            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
+            * `link` (required): The URL of the blog post. This is where the content of the post is found.\n\n
+            * `pubdate` (required): The date of the blog post in the format `YYYY-MM-DD`. history4feed cannot accurately determine a post date in all cases, so you must enter it manually.\n\n
+            * `title` (required):  history4feed cannot accurately determine the title of a post in all cases, so you must enter it manually.\n\n
+            * `author` (optional): the value to be stored for the author of the post.
+            * `categories` (optional) : the value(s) to be stored for the category of the post. Pass as a list like `["tag1","tag2"]`.\n\n
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.\n\n
+            _Note: We do have a proof-of-concept to scrape a site for all blog post urls, titles, and pubdate called [sitemap2posts](https://github.com/muchdogesec/sitemap2posts) which can help form the request body needed for this endpoint._
+            """
+        ),
+        responses={
+            201: PostJobSerializer,
+            404: OpenApiResponse(H4FError, "Feed does not exist", examples=[HTTP404_EXAMPLE]),
+        },
+        tags=["Feeds"],
+    )
+    def create(self, request, *args, feed_id=None, **kwargs):
+        feed_obj = get_object_or_404(Feed.objects, id=feed_id)
+        data = dict(**request.data, feed_id=feed_id, feed=feed_id)
+        s = PostSerializer(data=data)
+        s.is_valid(raise_exception=True)
+        s2 = PostCreateSerializer(data=data)
+        s2.is_valid(raise_exception=True)
+        post = s2.save()
+        job_obj = task_helper.new_patch_posts_job(post.feed, [post], s.data['profile_id'])
+        job_resp = JobSerializer(job_obj).data.copy()
+        job_resp.update(post_id=post.id)
+        return Response(job_resp, status=status.HTTP_201_CREATED)
 
 
 class FeedView(viewsets.ModelViewSet):
@@ -246,10 +283,11 @@ class FeedView(viewsets.ModelViewSet):
         summary="Create a new Feed",
         description=textwrap.dedent(
             """
-        Use this endpoint to create to a new feed. The `url` value used should be a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned.\n\n
-        If the  `url` is already associated with an existing Feed, using it via this endpoint will trigger an update request for the blog. If you want to add the `url` with new settings, first delete the feed it is associated with.\n\n
-        `include_remote_blogs` is a boolean setting. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to `false`.\n\n
-        `profile_id` is an optional field that can be passed in the request body and accepts a UUIDv4. You should not pass it. We (DOGESEC) use this property for integration with Obstracts.\n\n
+        Use this endpoint to create to a new feed.\n\n
+        The following key/values are accepted in the body of the request:\n\n
+        * `url` (required): a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned. If the  `url` is already associated with an existing Feed, using it via this endpoint will trigger an update request for the blog. If you want to add the same `url` with new settings, first delete the existing feed it is associated with.\n\n
+        * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to false. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.\n\n
+        * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
         The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
         """
         ),
@@ -287,7 +325,8 @@ class FeedView(viewsets.ModelViewSet):
             """
         Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.\n\n
         Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.\n\n
-        `profile_id` is an optional field that can be passed in the request body and accepts a UUIDv4. You should not pass it. We (DOGESEC) use this property for integration with Obstracts.\n\n
+        The following key/values are accepted in the body of the request:\n\n        
+        * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n\n\n
         The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
         """
         ),

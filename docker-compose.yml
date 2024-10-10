@@ -1,5 +1,6 @@
 services:
     django:
+        image: history4feed
         build: .
         command: >
                 bash -c "
@@ -24,6 +25,7 @@ services:
             redis:
                 condition: service_started
     celery:
+        image: history4feed
         build: .
         command: >
                 bash -c "
