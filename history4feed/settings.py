@@ -26,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ['DJANGO_SECRET']
+SECRET_KEY = os.environ.get('DJANGO_SECRET')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -90,7 +90,7 @@ DATABASES = {
         'NAME': os.getenv('POSTGRES_DB'),            # Database name
         'USER': os.getenv('POSTGRES_USER'),          # Database user
         'PASSWORD': os.getenv('POSTGRES_PASSWORD'),  # Database password
-        'HOST': 'pgdb',                              # PostgreSQL service name in Docker Compose
+        'HOST': os.getenv('POSTGRES_HOST', 'pgdb'),                              # PostgreSQL service name in Docker Compose
         'PORT': '5432',                              # PostgreSQL default port
     },
     'sqlite': {
@@ -178,7 +178,7 @@ SCRAPFLY_KEY = os.getenv("SCRAPFLY_APIKEY")
 # H4F_CONCURRENT_TASKS = 1 if not SCRAPFLY_KEY else 20
 WAYBACK_BACKOFF_TIME = int(os.getenv("WAYBACK_BACKOFF_TIME", 20)) #should be at least 20 seconds because wayback usually blocks your IP for a few minutes
 
-EARLIEST_SEARCH_DATE = datetime.strptime(os.environ["EARLIEST_SEARCH_DATE"], "%Y-%m-%dT%H:%M:%SZ")
+EARLIEST_SEARCH_DATE = datetime.strptime(os.environ.get("EARLIEST_SEARCH_DATE", "2024-01-01T00:00:00Z"), "%Y-%m-%dT%H:%M:%SZ")
 WAYBACK_SLEEP_SECONDS = int(os.getenv("WAYBACK_SLEEP_SECONDS", 20))
 REQUEST_RETRY_COUNT = int(os.getenv("REQUEST_RETRY_COUNT", 3))
 
