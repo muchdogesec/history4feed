@@ -47,7 +47,6 @@ class Feed(models.Model):
     latest_item_pubdate = models.DateTimeField(null=True, help_text="pubdate of latest post")
     datetime_added = models.DateTimeField(auto_now_add=True, editable=False, help_text="date feed entry was added to database")
     feed_type = models.CharField(choices=FeedType.choices, max_length=12, null=False, editable=False, help_text="type of feed")
-    include_remote_blogs = models.BooleanField(default=False)
 
     def get_post_count(self):
         return self.posts.count()
@@ -56,10 +55,6 @@ class Feed(models.Model):
         if not self.id:
             self.id = stix_id(self.url)
         return super().save(*args, **kwargs)
-    
-    
-    def should_skip_post(self, post_link: str):
-        return (not self.include_remote_blogs) and urlparse(self.url).hostname.split('.')[-2:] != urlparse(post_link).hostname.split('.')[-2:]
 
 class Job(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, help_text="UUID of job")
@@ -70,6 +65,7 @@ class Job(models.Model):
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
     info = models.CharField(max_length=FEED_DESCRIPTION_MAX_LENGTH, help_text="contains a useful summary of the job (e.g. number of posts retrieved, errors logged)")
     profile_id = models.UUIDField(null=True, blank=True)
+    include_remote_blogs = models.BooleanField(default=False)
 
     def urls(self):
         retval = {}
@@ -78,6 +74,9 @@ class Job(models.Model):
             retval[ft_job.status] = retval.get(ft_job.status, [])
             retval[ft_job.status].append(dict(url=ft_job.link, id=ft_job.post_id))
         return retval
+    
+    def should_skip_post(self, post_link: str):
+        return (not self.include_remote_blogs) and urlparse(self.feed.url).hostname.split('.')[-2:] != urlparse(post_link).hostname.split('.')[-2:]
 
 
 class FullTextState(models.TextChoices):
