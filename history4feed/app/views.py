@@ -210,7 +210,7 @@ class PostView(
             The following key/values are accepted in the body of the request:\n\n
             * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
             * `link` (required): The URL of the blog post. This is where the content of the post is found.\n\n
-            * `pubdate` (required): The date of the blog post in the format `YYYY-MM-DD`. history4feed cannot accurately determine a post date in all cases, so you must enter it manually.\n\n
+            * `pubdate` (required): The date of the blog post in the format `YYYY-MM-DDTHH:MM:SS.sssZ`. history4feed cannot accurately determine a post date in all cases, so you must enter it manually.\n\n
             * `title` (required):  history4feed cannot accurately determine the title of a post in all cases, so you must enter it manually.\n\n
             * `author` (optional): the value to be stored for the author of the post.
             * `categories` (optional) : the value(s) to be stored for the category of the post. Pass as a list like `["tag1","tag2"]`.\n\n
