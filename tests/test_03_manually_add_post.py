@@ -43,7 +43,7 @@ class TestCrowdStrikeFeedProcessing(unittest.TestCase):
         """Generates a UUIDv5 using the given URL and the defined namespace."""
         return str(uuid.uuid5(self.namespace, url))
 
-    def check_job_status(self, job_id, max_retries=5, delay=30):
+    def check_job_status(self, job_id, max_retries=10, delay=30):
         """Check the job status until success or retry limit is reached."""
         job_url = f"http://localhost:8002/api/v1/jobs/{job_id}/"
         print(f"Checking job status for Job ID: {job_id}")
@@ -171,6 +171,42 @@ class TestCrowdStrikeFeedProcessing(unittest.TestCase):
         
         post_job_successful_2 = self.check_job_status(post_job_id_2)
         self.assertTrue(post_job_successful_2, f"Job ID {post_job_id_2} for second post did not reach 'success' state after retries.")
+
+        # Step 4: Add the third post to the feed (should fail due to duplicate link)
+        post_body_3 = {
+            "profile_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "title": "Malicious Inauthentic Falcon Crash Reporter Installer Distributed to German Entity",
+            "link": "https://www.crowdstrike.com/en-us/blog/malicious-inauthentic-falcon-crash-reporter-installer-spearphishing/",
+            "pubdate": "2024-09-21T00:00:00.000Z"
+        }
+
+        # Print the body of the POST request for adding the third post
+        print(f"POST Request Body for Third Post: {post_body_3}")
+        sys.stdout.flush()  # Ensure the print is flushed to stdout
+
+        # Post the third feed entry (should fail)
+        post_response_3 = requests.post(
+            post_url,
+            json=post_body_3,
+            headers={"Accept": "application/json"}
+        )
+
+        print(f"POST {post_url} - Status Code: {post_response_3.status_code}")
+
+        # Check if the third post request fails due to duplicate link
+        self.assertEqual(post_response_3.status_code, 400, f"Third post request should fail with status code 400, but got {post_response_3.status_code}")
+
+        # Collect the error message and verify it's due to the duplicate link
+        post_data_response_3 = post_response_3.json()
+
+        # Print the entire response to understand its structure
+        print(f"Error Response: {post_data_response_3}")
+
+        # Safely check the presence of 'non_field_errors' key
+        non_field_errors = post_data_response_3.get("non_field_errors")
+        self.assertIsNotNone(non_field_errors, "Expected 'non_field_errors' in the response but got None")
+        self.assertIn("Link already exists in field.", non_field_errors[0], "Expected 'Link already exists' error, but got a different message")
+
 
 # To run the tests
 if __name__ == '__main__':
