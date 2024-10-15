@@ -111,7 +111,8 @@ class TestCrowdStrikeFeedProcessing(unittest.TestCase):
             "pubdate": "2024-03-22T16:11:03.471Z",
             "author": "test",
             "categories": [
-                "test"
+                "test",
+                "test2"
             ]
         }
         

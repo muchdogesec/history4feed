@@ -85,6 +85,8 @@ class BaseTest(unittest.TestCase):
         }
 
         # Posts corresponding to feed IDs
+
+        #`d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test1/2024/09/01/same-ioc-across-posts.html+2024-09-01T08:00:00.000000Z` = 84a8ff1c-c463-5a97-b0c4-93daf7102b5f
         self.posts = {
             "d1d96b71-c687-50db-9d2b-d0092d1d163a": [
                 {
