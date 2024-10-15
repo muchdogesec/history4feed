@@ -86,7 +86,8 @@ class ErrorResp(Response):
             Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.\n\n
             The following key/values are accepted in the body of the request:\n\n        
             * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
-            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.\n\n
+            Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).
             """
         ),
         summary="Update a Post in a Feed",
@@ -210,11 +211,12 @@ class PostView(
             The following key/values are accepted in the body of the request:\n\n
             * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
             * `link` (required): The URL of the blog post. This is where the content of the post is found.\n\n
-            * `pubdate` (required): The date of the blog post in the format `YYYY-MM-DD`. history4feed cannot accurately determine a post date in all cases, so you must enter it manually.\n\n
+            * `pubdate` (required): The date of the blog post in the format `YYYY-MM-DDTHH:MM:SS.sssZ`. history4feed cannot accurately determine a post date in all cases, so you must enter it manually.\n\n
             * `title` (required):  history4feed cannot accurately determine the title of a post in all cases, so you must enter it manually.\n\n
             * `author` (optional): the value to be stored for the author of the post.
             * `categories` (optional) : the value(s) to be stored for the category of the post. Pass as a list like `["tag1","tag2"]`.\n\n
             The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.\n\n
+            Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).\n\n
             _Note: We do have a proof-of-concept to scrape a site for all blog post urls, titles, and pubdate called [sitemap2posts](https://github.com/muchdogesec/sitemap2posts) which can help form the request body needed for this endpoint._
             """
         ),
@@ -231,7 +233,7 @@ class PostView(
         s.is_valid(raise_exception=True)
         s2 = PostCreateSerializer(data=data)
         s2.is_valid(raise_exception=True)
-        post = s2.save()
+        post = s2.save(added_manually=True)
         job_obj = task_helper.new_patch_posts_job(post.feed, [post], s.data['profile_id'])
         job_resp = JobSerializer(job_obj).data.copy()
         job_resp.update(post_id=post.id)
@@ -285,10 +287,11 @@ class FeedView(viewsets.ModelViewSet):
             """
         Use this endpoint to create to a new feed.\n\n
         The following key/values are accepted in the body of the request:\n\n
-        * `url` (required): a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned. If the  `url` is already associated with an existing Feed, using it via this endpoint will trigger an update request for the blog. If you want to add the same `url` with new settings, first delete the existing feed it is associated with.\n\n
+        * `url` (required): a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned.\n\n
         * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to false. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.\n\n
         * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
-        The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+        The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.\n\n
+        The `id` of a Feed is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used is `<FEED_URL>` (e.g. `https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-encoded.xml` would have the id `d1d96b71-c687-50db-9d2b-d0092d1d163a`). Therefore, you cannot add a URL that already exists, you must first delete it to add it with new settings.
         """
         ),
         tags=open_api_tags,
@@ -308,7 +311,7 @@ class FeedView(viewsets.ModelViewSet):
             return ErrorResp(406, "Invalid feed url", details={"error": str(e)})
         s.run_validation({**feed, 'profile_id': profile_id})
         feed_obj: Feed = s.create(validated_data=feed)
-        job_obj = task_helper.new_job(feed_obj, profile_id)
+        job_obj = task_helper.new_job(feed_obj, profile_id, s.validated_data.get('include_remote_blogs', False))
 
         feed = self.serializer_class(feed_obj).data.copy()
         feed.update(
@@ -323,12 +326,13 @@ class FeedView(viewsets.ModelViewSet):
         request=PatchSerializer,
         description=textwrap.dedent(
             """
-        Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.\n\n
-        Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.\n\n
-        The following key/values are accepted in the body of the request:\n\n        
-        * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n\n\n
-        The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
-        """
+            Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.\n\n
+            Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.\n\n
+            The following key/values are accepted in the body of the request:\n\n        
+            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.\n\n
+            Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).
+            """
         ),
         tags=open_api_tags,
         responses={
@@ -340,7 +344,7 @@ class FeedView(viewsets.ModelViewSet):
         s = PatchSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         feed_obj: Feed = self.get_object()
-        job_obj = task_helper.new_job(feed_obj, s.data['profile_id'])
+        job_obj = task_helper.new_job(feed_obj, s.data['profile_id'], s.validated_data.get('include_remote_blogs', False))
         feed = self.serializer_class(feed_obj).data.copy()
 
         feed.update(

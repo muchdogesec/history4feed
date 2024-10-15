@@ -62,7 +62,7 @@ class TestCrowdStrikeFeedProcessing(unittest.TestCase):
         return False
 
     def test_crowdstrike_feed_and_post(self):
-        """Test adding the CrowdStrike feed, checking job status, and adding a post."""
+        """Test adding the CrowdStrike feed, checking job status, and adding multiple posts."""
 
         # Step 1: Add the feed and check the job status
         feed_uuid = self.generate_uuid(self.feed_url)
@@ -103,41 +103,74 @@ class TestCrowdStrikeFeedProcessing(unittest.TestCase):
         job_successful = self.check_job_status(job_id)
         self.assertTrue(job_successful, f"Job ID {job_id} for feed did not reach 'success' state after retries.")
         
-        # Step 2: Add a post to the feed
+        # Step 2: Add the first post to the feed
         post_url = f"http://localhost:8002/api/v1/feeds/{self.feed_data['id']}/posts/"
-        post_body = {
+        post_body_1 = {
             "title": "COVID-19 Cyber Threats | Weekly Updates | CrowdStrike",
             "link": "https://www.crowdstrike.com/blog/covid-19-cyber-threats/",
             "pubdate": "2024-03-22T16:11:03.471Z",
             "author": "test",
             "categories": [
-                "test"
+                "test",
+                "test2"
             ]
         }
         
-        # Print the body of the POST request for adding a post
-        print(f"POST Request Body for Post: {post_body}")
+        # Print the body of the POST request for adding the first post
+        print(f"POST Request Body for First Post: {post_body_1}")
         sys.stdout.flush()  # Ensure the print is flushed to stdout
 
         # Post the new feed entry
-        post_response = requests.post(
+        post_response_1 = requests.post(
             post_url,
-            json=post_body,
+            json=post_body_1,
             headers={"Accept": "application/json"}
         )
         
-        print(f"POST {post_url} - Status Code: {post_response.status_code}")
+        print(f"POST {post_url} - Status Code: {post_response_1.status_code}")
         
         # Check if the post request was successful
-        self.assertEqual(post_response.status_code, 201, f"Post request failed with status code {post_response.status_code}")
+        self.assertEqual(post_response_1.status_code, 201, f"First post request failed with status code {post_response_1.status_code}")
         
         # Collect the post response data and check job status
-        post_data_response = post_response.json()
-        post_job_id = post_data_response.get("id")  # Extract job ID from the 'id' key
-        self.assertIsNotNone(post_job_id, "Job ID not returned in post response")
+        post_data_response_1 = post_response_1.json()
+        post_job_id_1 = post_data_response_1.get("id")  # Extract job ID from the 'id' key
+        self.assertIsNotNone(post_job_id_1, "Job ID not returned in first post response")
         
-        post_job_successful = self.check_job_status(post_job_id)
-        self.assertTrue(post_job_successful, f"Job ID {post_job_id} for post did not reach 'success' state after retries.")
+        post_job_successful_1 = self.check_job_status(post_job_id_1)
+        self.assertTrue(post_job_successful_1, f"Job ID {post_job_id_1} for first post did not reach 'success' state after retries.")
+        
+        # Step 3: Add the second post to the feed only after the first post job is successful
+        post_body_2 = {
+            "profile_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "title": "Malicious Inauthentic Falcon Crash Reporter Installer Distributed to German Entity",
+            "link": "https://www.crowdstrike.com/en-us/blog/malicious-inauthentic-falcon-crash-reporter-installer-spearphishing/",
+            "pubdate": "2024-09-21T00:00:00.000Z"
+        }
+        
+        # Print the body of the POST request for adding the second post
+        print(f"POST Request Body for Second Post: {post_body_2}")
+        sys.stdout.flush()  # Ensure the print is flushed to stdout
+
+        # Post the second feed entry
+        post_response_2 = requests.post(
+            post_url,
+            json=post_body_2,
+            headers={"Accept": "application/json"}
+        )
+        
+        print(f"POST {post_url} - Status Code: {post_response_2.status_code}")
+        
+        # Check if the second post request was successful
+        self.assertEqual(post_response_2.status_code, 201, f"Second post request failed with status code {post_response_2.status_code}")
+        
+        # Collect the second post response data and check job status
+        post_data_response_2 = post_response_2.json()
+        post_job_id_2 = post_data_response_2.get("id")  # Extract job ID from the 'id' key
+        self.assertIsNotNone(post_job_id_2, "Job ID not returned in second post response")
+        
+        post_job_successful_2 = self.check_job_status(post_job_id_2)
+        self.assertTrue(post_job_successful_2, f"Job ID {post_job_id_2} for second post did not reach 'success' state after retries.")
 
 # To run the tests
 if __name__ == '__main__':

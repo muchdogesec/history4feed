@@ -56,7 +56,6 @@ class Feed(models.Model):
     latest_item_pubdate = models.DateTimeField(null=True, help_text="pubdate of latest post")
     datetime_added = models.DateTimeField(auto_now_add=True, editable=False, help_text="date feed entry was added to database")
     feed_type = models.CharField(choices=FeedType.choices, max_length=12, null=False, editable=False, help_text="type of feed")
-    include_remote_blogs = models.BooleanField(default=False)
 
     def get_post_count(self):
         return self.posts.count()
@@ -65,10 +64,6 @@ class Feed(models.Model):
         if not self.id:
             self.id = stix_id(self.url)
         return super().save(*args, **kwargs)
-    
-    
-    def should_skip_post(self, post_link: str):
-        return (not self.include_remote_blogs) and urlparse(self.url).hostname.split('.')[-2:] != urlparse(post_link).hostname.split('.')[-2:]
 
 class Job(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, help_text="UUID of job")
@@ -79,6 +74,7 @@ class Job(models.Model):
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
     info = models.CharField(max_length=FEED_DESCRIPTION_MAX_LENGTH, help_text="contains a useful summary of the job (e.g. number of posts retrieved, errors logged)")
     profile_id = models.UUIDField(null=True, blank=True)
+    include_remote_blogs = models.BooleanField(default=False)
 
     def urls(self):
         retval = {}
@@ -87,6 +83,9 @@ class Job(models.Model):
             retval[ft_job.status] = retval.get(ft_job.status, [])
             retval[ft_job.status].append(dict(url=ft_job.link, id=ft_job.post_id))
         return retval
+    
+    def should_skip_post(self, post_link: str):
+        return (not self.include_remote_blogs) and urlparse(self.feed.url).hostname.split('.')[-2:] != urlparse(post_link).hostname.split('.')[-2:]
 
 
 class FullTextState(models.TextChoices):
@@ -103,11 +102,12 @@ class Post(models.Model):
     description = models.CharField(max_length=POST_DESCRIPTION_MAX_LENGTH, blank=True, help_text="found in the <item> element of feed output")
     link = models.URLField(max_length=1000, help_text="link to full article. found in the <item> element of feed output", validators=[normalize_url])
     pubdate = models.DateTimeField(help_text="date of publication.")
-    author = models.CharField(max_length=1000, help_text="author of the post")
+    author = models.CharField(max_length=1000, help_text="author of the post", null=True, blank=True)
     categories = models.ManyToManyField(Category, related_name="posts", help_text="categories of the post", blank=True)
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE, related_name="posts", help_text="feed id this item belongs too")
     is_full_text = models.BooleanField(default=False, help_text="if full text has been retrieved")
     content_type = models.CharField(default="plain/text", max_length=200, help_text="content type of the description")
+    added_manually = models.BooleanField(default=False)
 
     class  Meta:
         constraints = [
