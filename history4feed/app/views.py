@@ -86,7 +86,8 @@ class ErrorResp(Response):
             Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.\n\n
             The following key/values are accepted in the body of the request:\n\n        
             * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
-            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.\n\n
+            Each post ID is generated using a UUID v5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used is `<FEED_ID>+<POST_URL>+<PROFILE_ID>`.
             """
         ),
         summary="Update a Post in a Feed",
@@ -215,6 +216,7 @@ class PostView(
             * `author` (optional): the value to be stored for the author of the post.
             * `categories` (optional) : the value(s) to be stored for the category of the post. Pass as a list like `["tag1","tag2"]`.\n\n
             The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.\n\n
+            Each post ID is generated using a UUID v5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used is `<FEED_ID>+<POST_URL>+<PROFILE_ID>`.\n\n
             _Note: We do have a proof-of-concept to scrape a site for all blog post urls, titles, and pubdate called [sitemap2posts](https://github.com/muchdogesec/sitemap2posts) which can help form the request body needed for this endpoint._
             """
         ),
@@ -285,10 +287,11 @@ class FeedView(viewsets.ModelViewSet):
             """
         Use this endpoint to create to a new feed.\n\n
         The following key/values are accepted in the body of the request:\n\n
-        * `url` (required): a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned. If the  `url` is already associated with an existing Feed, using it via this endpoint will trigger an update request for the blog. If you want to add the same `url` with new settings, first delete the existing feed it is associated with.\n\n
+        * `url` (required): a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned.\n\n
         * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to false. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.\n\n
         * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
-        The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+        The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.\n\n
+        The `id` of a Feed is generated using a UUID v5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used is `<FEED_URL>+<PROFILE_ID>`. Therefore, you cannot add a Feed URL/Profile combination that already exists. Each post ID is also generated using a UUID v5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used is `<FEED_ID>+<POST_URL>+<PROFILE_ID>`.
         """
         ),
         tags=open_api_tags,
@@ -327,7 +330,8 @@ class FeedView(viewsets.ModelViewSet):
         Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.\n\n
         The following key/values are accepted in the body of the request:\n\n        
         * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n\n\n
-        The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+        The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.\n\n
+        Each post ID is generated using a UUID v5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used is `<FEED_ID>+<POST_URL>+<PROFILE_ID>`.
         """
         ),
         tags=open_api_tags,
