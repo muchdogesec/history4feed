@@ -32,7 +32,7 @@ class PostSerializer(serializers.ModelSerializer):
         
     
     def run_validation(self, data=...):
-        if categories:= data.get('categories'):
+        if categories := data.get('categories'):
             data['categories'] = [Category.objects.get_or_create(name=name)[0].name for name in categories]
         return super().run_validation(data)
     

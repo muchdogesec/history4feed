@@ -102,7 +102,7 @@ class Post(models.Model):
     description = models.CharField(max_length=POST_DESCRIPTION_MAX_LENGTH, blank=True, help_text="found in the <item> element of feed output")
     link = models.URLField(max_length=1000, help_text="link to full article. found in the <item> element of feed output", validators=[normalize_url])
     pubdate = models.DateTimeField(help_text="date of publication.")
-    author = models.CharField(max_length=1000, help_text="author of the post")
+    author = models.CharField(max_length=1000, help_text="author of the post", null=True, blank=True)
     categories = models.ManyToManyField(Category, related_name="posts", help_text="categories of the post", blank=True)
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE, related_name="posts", help_text="feed id this item belongs too")
     is_full_text = models.BooleanField(default=False, help_text="if full text has been retrieved")
