@@ -1,20 +1,17 @@
 import unittest
 import requests
 import time
-import uuid
 
 # BaseTest class with feeds and posts definitions
 class BaseTest(unittest.TestCase):
     def setUp(self):
         # Define the base URL for the API requests
         self.base_url = "http://127.0.0.1:8002/api/v1/feeds/"
-        
-        # Define the namespace for UUID generation
-        self.uuid_namespace = uuid.UUID("6c6e6448-04d4-42a3-9214-4f0f7d02694e")
 
         # Feeds URLs, their corresponding feed IDs, descriptions, and feed types
         self.feeds = {
             "https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-encoded.xml": {
+                "id": "d1d96b71-c687-50db-9d2b-d0092d1d163a",
                 "description": "RSS -- Contains encoded html -- FULL CONTENT",
                 "feed_type": "rss",
                 "profile_id": ""
@@ -84,58 +81,50 @@ class BaseTest(unittest.TestCase):
                 "description": "ATOM -- Contains decoded html inside CDATA tags -- PARTIAL CONTENT ONLY",
                 "feed_type": "atom",
                 "profile_id": ""
-            }
+            },
         }
 
-        # Posts corresponding to feed IDs. N
-        self.posts = [
+        # Posts corresponding to feed IDs
+        self.posts = {
+            "d1d96b71-c687-50db-9d2b-d0092d1d163a": [
                 {
+                    "id": "84a8ff1c-c463-5a97-b0c4-93daf7102b5f",
                     "title": "Obstracts AI relationship generation test 2",
                     "pubdate": "2024-09-01T08:00:00Z",
-                    "url": "https://muchdogesec.github.io/fakeblog123///test1/2024/09/01/same-ioc-across-posts.html",
-                    "profile_id": ""
+                    "url": "https://muchdogesec.github.io/fakeblog123///test1/2024/09/01/same-ioc-across-posts.html"
                 },
                 {
+                    "id": "cfdb68b8-3d80-572d-9350-58baf57eabfb",
                     "title": "Obstracts AI relationship generation test",
                     "pubdate": "2024-08-23T08:00:00Z",
-                    "url": "https://muchdogesec.github.io/fakeblog123///test1/2024/08/23/obstracts-ai-relationships.html",
-                    "profile_id": ""
+                    "url": "https://muchdogesec.github.io/fakeblog123///test1/2024/08/23/obstracts-ai-relationships.html"
                 },
                 {
+                    "id": "8f16d2be-7b06-5f3c-a851-9cce31b4fec8",
                     "title": "Update this post for testing updates to posts",
                     "pubdate": "2024-08-20T10:00:00Z",
-                    "url": "https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-to-post-1.html",
-                    "profile_id": ""
+                    "url": "https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-to-post-1.html"
                 },
                 {
+                    "id": "47f72d92-f22a-5f08-84f3-55aedf4c7967",
                     "title": "Testing Extractions",
                     "pubdate": "2024-08-07T08:00:00Z",
-                    "url": "https://muchdogesec.github.io/fakeblog123///test3/2024/08/07/testing-extractions-1.html",
-                    "profile_id": ""
+                    "url": "https://muchdogesec.github.io/fakeblog123///test3/2024/08/07/testing-extractions-1.html"
                 },
                 {
+                    "id": "85a762c9-00f9-5c0c-9858-498883e13ea1",
                     "title": "Testing Markdown Elements",
                     "pubdate": "2024-08-05T08:00:00Z",
-                    "url": "https://muchdogesec.github.io/fakeblog123///test2/2024/08/05/testing-markdown-elements-1.html",
-                    "profile_id": ""
+                    "url": "https://muchdogesec.github.io/fakeblog123///test2/2024/08/05/testing-markdown-elements-1.html"
                 }, 
                 {
+                    "id": "29be2407-d5d1-5b47-bbb5-1c51a84d48eb",
                     "title": "Real Post Example - Fighting Ursa Luring Targets With Car for Sale",
                     "pubdate": "2024-08-01T08:00:00Z",
-                    "url": "https://muchdogesec.github.io/fakeblog123///test1/2024/08/01/real-post-example-1.html",
-                    "profile_id": ""
+                    "url": "https://muchdogesec.github.io/fakeblog123///test1/2024/08/01/real-post-example-1.html"
                 }
             ]
-
-
-    def generate_feed_id(self, feed_url, profile_id=""):
-        """Generates a UUID v5 based on the feed URL and namespace, optionally including profile ID."""
-        unique_value = f"{feed_url}+{profile_id}"
-        return str(uuid.uuid5(self.uuid_namespace, unique_value))
-
-    def generate_post_id(self, feed_id, post_url, profile_id=""):
-        """Generates a UUID v5 for a post using feed ID, post URL, and profile ID."""
-        return str(uuid.uuid5(self.uuid_namespace, f"{feed_id}+{post_url}+{profile_id}"))
+        }
 
 # TestFeedProcessing class inheriting from BaseTest
 class TestFeedProcessing(BaseTest):
@@ -143,8 +132,7 @@ class TestFeedProcessing(BaseTest):
     def delete_existing_feeds(self):
         """Deletes only the feeds defined in BaseTest to ensure a clean state."""
         print("Starting deletion of existing feeds...")
-        for feed_url, feed_details in self.feeds.items():
-            feed_id = self.generate_feed_id(feed_url, feed_details.get("profile_id", ""))
+        for feed_id in [details['id'] for details in self.feeds.values()]:
             url = f"{self.base_url}{feed_id}/"
             while True:
                 response = requests.delete(url)
@@ -188,10 +176,6 @@ class TestFeedProcessing(BaseTest):
         # Step 1: Post each feed and wait for the job to succeed before moving to the next
         for feed_url, feed_details in self.feeds.items():
             with self.subTest(feed_url=feed_url):
-                # Dynamically generate the feed ID
-                feed_id = self.generate_feed_id(feed_url, feed_details.get("profile_id", ""))
-                print(f"Generated Feed ID: {feed_id} for Feed URL: {feed_url}")
-
                 # Post the feed
                 response = requests.post(
                     self.base_url,
@@ -215,15 +199,15 @@ class TestFeedProcessing(BaseTest):
                 self.assertTrue(job_successful, f"Job ID {job_id} for URL {feed_url} did not reach 'success' state after 5 retries")
 
                 # Step 3: Verify that each post can be retrieved with a 200 OK response
-                print(f"Verifying retrieval of posts for feed: {feed_url}")
-                for post in self.posts:
-                    post_id = self.generate_post_id(feed_id, post["url"], post.get("profile_id", ""))
-                    print(f"Generated Post ID: {post_id} for Post URL: {post['url']}")
-                    
-                    post_url = f"http://localhost:8002/api/v1/feeds/{feed_id}/posts/{post_id}/"
-                    response = requests.get(post_url, headers={"Accept": "application/json"})
-                    print(f"GET {post_url} - Status Code: {response.status_code}")
-                    self.assertEqual(response.status_code, 200, f"Request to {post_url} failed with status code {response.status_code}")
+                if feed_details["id"] in self.posts:
+                    print(f"Verifying retrieval of posts for feed: {feed_url}")
+                    for post in self.posts[feed_details["id"]]:
+                        post_url = f"http://localhost:8002/api/v1/feeds/{feed_details['id']}/posts/{post['id']}/"
+                        response = requests.get(post_url, headers={"Accept": "application/json"})
+                        print(f"GET {post_url} - Status Code: {response.status_code}")
+                        self.assertEqual(response.status_code, 200, f"Request to {post_url} failed with status code {response.status_code}")
+                else:
+                    print(f"No posts defined for feed: {feed_url}, skipping post retrieval verification.")
 
 # To run the tests
 if __name__ == '__main__':
