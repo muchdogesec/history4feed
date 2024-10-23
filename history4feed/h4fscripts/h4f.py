@@ -29,12 +29,15 @@ def fetch_page_with_retries(url, retry_count=3, sleep_seconds=settings.WAYBACK_S
             if i > 0:
                 time.sleep(sleep_seconds * 1.5 ** (i-1))
             return fetch_page(session, url, **kwargs)
+        except FatalError:
+            raise
         except BaseException as e:
             error = e
             print(error)
     raise ConnectionError(f"could not fetch page after {retry_count} retries") from error
     
-    
+class FatalError(Exception):
+    pass
 
 def fetch_page(session, url, headers=None) -> tuple[bytes, str, str]:
     proxy_apikey = os.getenv("SCRAPFILE_APIKEY")
@@ -48,6 +51,8 @@ def fetch_page(session, url, headers=None) -> tuple[bytes, str, str]:
         if resp.status_code != 200:
             raise ScrapflyError(json_data)
         result = SimpleNamespace(**json_data['result'])
+        if result.status_code > 499:
+            raise FatalError(f"Got server error {result.status_code}, stopping")
         if result.status_code > 399:
             raise history4feedException(f"PROXY_GET Request failed for `{url}`, status: {result.status_code}, reason: {result.status}")
         elif result.status_code > 299:

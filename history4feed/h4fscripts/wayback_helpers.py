@@ -4,7 +4,7 @@ from datetime import datetime as dt
 from django.conf import settings
 from collections import namedtuple
 from urllib.parse import urlencode
-from .h4f import fetch_page_with_retries
+from .h4f import FatalError, fetch_page_with_retries
 
 DEFAULT_USER_AGENT = "curl"
 
@@ -34,6 +34,8 @@ def cdx_search(url, earliest: dt, latest: dt=None, retry_count=3, sleep_seconds=
             res_json = json.loads(res)
             error = None
             break
+        except FatalError:
+            return []
         except BaseException as e:
             error = e
             continue
