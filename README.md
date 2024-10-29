@@ -44,13 +44,11 @@ To create one using the default settings:
 cp .env.example .env
 ```
 
-#### Proxy
+### A not on proxy secrets
 
 We strongly recommend using the ScrapFly proxy service with history4feed. Though we have no affiliation with them, it is the best proxy service we've tested and thus built in support for it to history4feed.
 
 Once your signed up to [ScrapFly](https://scrapfly.io/) grab your API key and add it in the `.env` file under `SCRAPFILE_APIKEY=`
-
-#### No proxy
 
 If you're not using a Proxy it is very likely you'll run into rate limits on the WayBack Machine and the blogs you're requesting the full text from.
 
@@ -58,6 +56,10 @@ To try an alleviate this, you can set the following options in the `.env` file t
 
 * `WAYBACK_SLEEP_SECONDS`: This is useful when a large amount of posts are returned. This sets the time between each request to get the full text of the article to reduce servers blocking robotic requests.
 * `REQUEST_RETRY_COUNT`: This is useful when a large amount of posts are returned. This sets the number of retries when a non-200 response is returned.
+
+#### A note on Django and Postgres secrets
+
+Note, if you intend on using this for testing, you can leave the variables in the `.env` as is. However, these need to be changed in a production install for security.
 
 #### Backfill logic settings
 
@@ -82,22 +84,6 @@ sudo docker compose up
 The webserver (Django) should now be running on: http://127.0.0.1:8002/
 
 You can access the Swagger UI for the API in a browser at: http://127.0.0.1:8002/api/schema/swagger-ui/
-
-#### Note on Django
-
-The webserver is Django.
-
-To create an admin user in Django
-
-```shell
-sudo docker compose run django python manage.py createsuperuser
-```
-
-You can then access the admin dashboard via:
-
-http://127.0.0.1:8002/admin
-
-Note, if you intend on using this in production, you should also modify the variables in the `.env` file for `POSTGRES_USER`, `POSTGRES_PASS`, and `DJANGO_SECRET`.
 
 ## Useful supporting tools
 
