@@ -1,29 +1,23 @@
-#
-name: Create and publish the Public Docker image for Obstracts Web Staging
-description: This workflow builds a Docker image and pushes it to GitHub Container Registry (GHCR) when changes are pushed to the `main` branch. It uses secrets in the `obstracts_staging` environment and therefore keeps the visibility as private for the image.
+name: Create and publish the Docker image for Obstracts Web Staging
+description: This workflow builds a Docker image and pushes it to GitHub Container Registry (GHCR) when changes are pushed to the `staging` branch. It uses secrets in the `obstracts_staging` environment and therefore keeps the visibility as private for the image.
 
-# Configures this workflow to run every time a change is pushed to the branch called `release`.
 on:
   push:
-    branches: ['main']
+    branches: ['staging']
 
-# Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}_staging
+  IMAGE_NAME: ${{ github.repository }}_obstracts_web_staging
 
-# There is a single job in this workflow. It's configured to run on the latest available version of Ubuntu.
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
-    environment: obstracts_web_staging # Specify the GitHub environment here
-    # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
+    environment: obstracts_web_staging
     permissions:
       contents: read
       packages: write
       attestations: write
       id-token: write
-      # 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
