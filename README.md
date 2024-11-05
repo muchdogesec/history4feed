@@ -44,29 +44,6 @@ To create one using the default settings:
 cp .env.example .env
 ```
 
-### A not on proxy secrets
-
-We strongly recommend using the ScrapFly proxy service with history4feed. Though we have no affiliation with them, it is the best proxy service we've tested and thus built in support for it to history4feed.
-
-Once your signed up to [ScrapFly](https://scrapfly.io/) grab your API key and add it in the `.env` file under `SCRAPFILE_APIKEY=`
-
-If you're not using a Proxy it is very likely you'll run into rate limits on the WayBack Machine and the blogs you're requesting the full text from.
-
-To try an alleviate this, you can set the following options in the `.env` file to avoid restrictions
-
-* `WAYBACK_SLEEP_SECONDS`: This is useful when a large amount of posts are returned. This sets the time between each request to get the full text of the article to reduce servers blocking robotic requests.
-* `REQUEST_RETRY_COUNT`: This is useful when a large amount of posts are returned. This sets the number of retries when a non-200 response is returned.
-
-#### A note on Django and Postgres secrets
-
-Note, if you intend on using this for testing, you can leave the variables in the `.env` as is. However, these need to be changed in a production install for security.
-
-#### Backfill logic settings
-
-The `.env` file also determines how far history4feed will backfill posts for newly added feeds using `EARLIEST_SEARCH_DATE`.
-
-e.g. `EARLIEST_SEARCH_DATE=2020-01-01T00:00:00Z` will import all posts with a publish date >= `2020-01-01T00:00:00Z`
-
 ### Build the Docker Image
 
 ```shell
@@ -87,6 +64,7 @@ You can access the Swagger UI for the API in a browser at: http://127.0.0.1:8002
 
 ## Useful supporting tools
 
+* [Full Text, Full Archive RSS Feeds for any Blog](https://www.dogesec.com/blog/full_text_rss_atom_blog_feeds/)
 * [An up-to-date list of threat intel blogs that post cyber threat intelligence research](https://github.com/muchdogesec/awesome_threat_intel_blogs)
 * [Donate to the Wayback Machine](https://archive.org/donate)
 
