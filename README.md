@@ -38,11 +38,13 @@ git clone https://github.com/muchdogesec/history4feed
 
 history4feed has various settings that are defined in an `.env` file.
 
-To create one using the default settings:
+To create a template for the file:
 
 ```shell
 cp .env.example .env
 ```
+
+To see more information about how to set the variables, and what they do, read the `.env.markdown` file.
 
 ### Build the Docker Image
 
