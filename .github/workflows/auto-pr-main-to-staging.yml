@@ -1,5 +1,4 @@
-name: Create a PR to Staging when commit to main
-description: Simplifies the workflow for pushing app to staging
+name: Auto Create Staging PR
 
 on:
   push:
@@ -7,19 +6,28 @@ on:
       - main
 
 jobs:
-  create-pr:
+  create-staging-pr:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Create PR from main to staging
-        uses: peter-evans/create-pull-request@v5
+        uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          base: staging
-          head: main
-          title: "Create PR from main to staging"
-          body: "This PR was automatically created to sync changes from `main` to `staging`."
-          branch: auto-pr-main-to-staging
-          delete-branch: true
+          fetch-depth: 0  # Fetch all history for all branches
+
+      - name: Create Pull Request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the latest commit message from main
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          
+          # Create PR using GitHub CLI
+          gh pr create \
+            --base staging \
+            --head main \
+            --title "Sync staging with main - $(date +%Y-%m-%d)" \
+            --body "This PR was automatically created to sync the following changes from main to staging:
+
+            Latest commit: $COMMIT_MSG
+            
+            Please review these changes carefully before merging to staging environment."
