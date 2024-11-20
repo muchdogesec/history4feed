@@ -48,3 +48,4 @@ wcwidth==0.2.13
 fake-useragent==1.5.1
 whitenoise==6.7.0
 hyperlink==21.0.0
+dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/schemathesis-changes-2024-11-20-13-28-04/dogesec_commons-0.0.1b2-py3-none-any.whl

@@ -76,8 +76,3 @@ class JobSerializer(serializers.ModelSerializer):
 
 class PostJobSerializer(JobSerializer):
     post_id = serializers.UUIDField()
-
-
-class H4FError(serializers.Serializer):
-    detail = serializers.CharField()
-    code = serializers.IntegerField()
