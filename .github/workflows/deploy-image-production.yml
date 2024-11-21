@@ -1,5 +1,4 @@
 name: Create and publish the Docker image for Obstracts Web Production
-description: This workflow builds a Docker image and pushes it to GitHub Container Registry (GHCR) when changes are pushed to the `main` branch. It uses secrets in the `obstracts_production` environment and therefore keeps the visibility as private for the image.
 
 on:
   push:
@@ -41,7 +40,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          visibility: private
           build-args: |
             EARLIEST_SEARCH_DATE=${{ secrets.EARLIEST_SEARCH_DATE }}
             SCRAPFILE_APIKEY=${{ secrets.SCRAPFILE_APIKEY }}

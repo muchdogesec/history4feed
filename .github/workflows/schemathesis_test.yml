@@ -1,0 +1,44 @@
+name: Auto Create Staging PR
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-schema-thesis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Get current date and create env file
+        id: date
+        run: echo "::set-output name=date::$(date -u -d 'yesterday' +'%Y-%m-%dT00:00:00Z')"
+    
+      - name: Set .env for docker-compose
+        run: |
+            echo 'CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP=1' >> .env
+            echo 'POSTGRES_HOST=pgdb' >> .env
+            echo 'POSTGRES_DB=postgres' >> .env
+            echo 'POSTGRES_USER=postgres' >> .env
+            echo 'POSTGRES_PASSWORD=postgres' >> .env
+            echo 'EARLIEST_SEARCH_DATE=${{ steps.date.outputs.date }}' >> .env
+         
+      - name: Start docker-compose H4F
+        uses: hoverkraft-tech/compose-action@v2.0.2
+    
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: run schemathesis
+        uses: schemathesis/action@v1
+        with:
+          schema: 'http://127.0.0.1:8001/api/schema'
+          checks: all
+          wait-for-schema: '30'
+          args: '--generation-allow-x00 false'
