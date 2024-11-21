@@ -59,6 +59,10 @@ jobs:
             DJANGO_SECRET=${{ secrets.DJANGO_SECRET }}
             DJANGO_DEBUG=${{ secrets.DJANGO_DEBUG }}
             CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP=${{ secrets.CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_HOST=${{ secrets.POSTGRES_HOST }} 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         with:
