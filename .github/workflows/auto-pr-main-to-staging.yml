@@ -1,0 +1,33 @@
+name: Auto Create Staging PR
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  create-staging-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for all branches
+
+      - name: Create Pull Request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the latest commit message from main
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          
+          # Create PR using GitHub CLI
+          gh pr create \
+            --base staging \
+            --head main \
+            --title "Sync staging with main - $(date +%Y-%m-%d)" \
+            --body "This PR was automatically created to sync the following changes from main to staging:
+
+            Latest commit: $COMMIT_MSG
+            
+            Please review these changes carefully before merging to staging environment."
