@@ -11,16 +11,16 @@ from .openapi_params import (
     XML_RESPONSE,
 )
 from .utils import (
-    H4FOrdering,
-    H4FPagination,
+    Ordering,
+    Pagination,
     MinMaxDateFilter,
     RSSRenderer,
     XMLPostPagination,
 )
-
+from dogesec_commons.utils.serializers import CommonErrorSerializer
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import FeedCreateSerializer, H4FError, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
+from .serializers import FeedCreateSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
 from .models import FulltextJob, Post, Feed, Job
 from rest_framework import (
     viewsets,
@@ -75,7 +75,7 @@ class Response(response.Response):
 
 class ErrorResp(Response):
     def __init__(self, status, title, details=None):
-        super().__init__({"detail": title, "code": status}, status=status)
+        super().__init__({"message": title, "code": status}, status=status)
 
 
 # Create your views here.
@@ -93,7 +93,7 @@ class ErrorResp(Response):
         summary="Update a Post in a Feed",
         responses={
             201: PostJobSerializer,
-            404: OpenApiResponse(H4FError, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
+            404: OpenApiResponse(CommonErrorSerializer, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
         },
         tags=["Feeds"],
         request=PatchSerializer,
@@ -106,8 +106,8 @@ class PostView(
     open_api_tags = ["Feeds"]
     serializer_class = PostSerializer
     lookup_url_kwarg = "post_id"
-    pagination_class = H4FPagination("posts")
-    filter_backends = [DjangoFilterBackend, H4FOrdering, MinMaxDateFilter]
+    pagination_class = Pagination("posts")
+    filter_backends = [DjangoFilterBackend, Ordering, MinMaxDateFilter]
     ordering_fields = ["pubdate", "title"]
     ordering = ["-pubdate"]
     minmax_date_fields = ["pubdate"]
@@ -139,8 +139,8 @@ class PostView(
         tags=open_api_tags,
         responses={
             200: XML_RESPONSE,
-            (404, "application/json"): OpenApiResponse(H4FError, "Feed not found", examples=[HTTP404_EXAMPLE]),
-            (400, "application/json"): OpenApiResponse(H4FError, "Request not understood", examples=[HTTP400_EXAMPLE]),
+            (404, "application/json"): OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
+            (400, "application/json"): OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
     )
     @decorators.action(
@@ -167,8 +167,8 @@ class PostView(
         tags=open_api_tags,
         responses={
             200: PostSerializer,
-            404: OpenApiResponse(H4FError, "Feed not found", examples=[HTTP404_EXAMPLE]),
-            400: OpenApiResponse(H4FError, "Request not understood", examples=[HTTP400_EXAMPLE]),
+            404: OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
+            400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
     )
     def list(self, request, *args, **kwargs):
@@ -185,8 +185,8 @@ class PostView(
         tags=open_api_tags,
         responses={
             200: PostSerializer,
-            404: OpenApiResponse(H4FError, "Feed or post not found", examples=[HTTP404_EXAMPLE]),
-            400: OpenApiResponse(H4FError, "Request not understood", examples=[HTTP400_EXAMPLE]),
+            404: OpenApiResponse(CommonErrorSerializer, "Feed or post not found", examples=[HTTP404_EXAMPLE]),
+            400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
     )
     def retrieve(self, request, *args, **kwargs):
@@ -222,7 +222,7 @@ class PostView(
         ),
         responses={
             201: PostJobSerializer,
-            404: OpenApiResponse(H4FError, "Feed does not exist", examples=[HTTP404_EXAMPLE]),
+            404: OpenApiResponse(CommonErrorSerializer, "Feed does not exist", examples=[HTTP404_EXAMPLE]),
         },
         tags=["Feeds"],
     )
@@ -245,10 +245,10 @@ class FeedView(viewsets.ModelViewSet):
     serializer_class = FeedSerializer
     queryset = Feed.objects.all()
     lookup_url_kwarg = "feed_id"
-    pagination_class = H4FPagination("feeds")
+    pagination_class = Pagination("feeds")
     http_method_names = ["get", "post", "patch", "delete"]
 
-    filter_backends = [DjangoFilterBackend, H4FOrdering, MinMaxDateFilter]
+    filter_backends = [DjangoFilterBackend, Ordering, MinMaxDateFilter]
     ordering_fields = [
         "datetime_added",
         "title",
@@ -298,8 +298,8 @@ class FeedView(viewsets.ModelViewSet):
         tags=open_api_tags,
         responses={
             201: FeedCreateSerializer,
-            400: OpenApiResponse(H4FError, "Bad request", examples=[HTTP400_EXAMPLE]),
-            406: OpenApiResponse(H4FError, "Invalid feed url", examples=[OpenApiExample(name="http-406", value={"detail": "invalid feed url", "code": 406})]),
+            400: OpenApiResponse(CommonErrorSerializer, "Bad request", examples=[HTTP400_EXAMPLE]),
+            406: OpenApiResponse(CommonErrorSerializer, "Invalid feed url", examples=[OpenApiExample(name="http-406", value={"detail": "invalid feed url", "code": 406})]),
         },
     )
     def create(self, request: request.Request, **kwargs):
@@ -338,7 +338,8 @@ class FeedView(viewsets.ModelViewSet):
         tags=open_api_tags,
         responses={
             201: FeedCreateSerializer,
-            400: OpenApiResponse(H4FError, "Request not understood", examples=[HTTP400_EXAMPLE]),
+            400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
+            (404, "application/json"): OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
         },
     )
     def partial_update(self, request, *args, **kwargs):
@@ -364,7 +365,7 @@ class FeedView(viewsets.ModelViewSet):
         tags=open_api_tags,
         responses={
             200: FeedSerializer,
-            400: OpenApiResponse(H4FError, "Request not understood", examples=[HTTP400_EXAMPLE]),
+            400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
     )
     def list(self, request, *args, **kwargs):
@@ -381,7 +382,7 @@ class FeedView(viewsets.ModelViewSet):
         tags=open_api_tags,
         responses={
             200: FeedSerializer,
-            404: OpenApiResponse(H4FError, "Not found", examples=[HTTP404_EXAMPLE]),
+            404: OpenApiResponse(CommonErrorSerializer, "Not found", examples=[HTTP404_EXAMPLE]),
         },
     )
     def retrieve(self, request, *args, **kwargs):
@@ -397,9 +398,9 @@ class FeedView(viewsets.ModelViewSet):
         ),
         tags=open_api_tags,
         responses={
-            200: OpenApiTypes.NONE,
+            200: {},
             404: OpenApiResponse(
-                H4FError,
+                CommonErrorSerializer,
                 "Not found",
                 examples=[HTTP404_EXAMPLE],
             ),
@@ -413,8 +414,8 @@ class JobView(
     mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
 ):
     serializer_class = JobSerializer
-    pagination_class = H4FPagination("jobs")
-    filter_backends = [DjangoFilterBackend, H4FOrdering]
+    pagination_class = Pagination("jobs")
+    filter_backends = [DjangoFilterBackend, Ordering]
     ordering_fields = ["run_datetime", "state"]
     ordering = ["-run_datetime"]
     open_api_tags = ["Jobs"]
@@ -445,7 +446,7 @@ class JobView(
         responses={
             200: JobSerializer,
             400: OpenApiResponse(
-                H4FError,
+                CommonErrorSerializer,
                 "Request not understood",
                 [HTTP400_EXAMPLE],
             ),
@@ -466,7 +467,7 @@ class JobView(
         responses={
             200: JobSerializer,
             404: OpenApiResponse(
-                H4FError,
+                CommonErrorSerializer,
                 "Job not found",
                 [HTTP404_EXAMPLE],
             ),
