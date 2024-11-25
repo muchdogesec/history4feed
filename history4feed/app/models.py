@@ -21,6 +21,7 @@ class JobState(models.TextChoices):
 class FeedType(models.TextChoices):
     RSS = "rss"
     ATOM = "atom"
+    SKELETON = "skeleton"
 
 # Create your models here.
 
@@ -56,6 +57,7 @@ class Feed(models.Model):
     latest_item_pubdate = models.DateTimeField(null=True, help_text="pubdate of latest post")
     datetime_added = models.DateTimeField(auto_now_add=True, editable=False, help_text="date feed entry was added to database")
     feed_type = models.CharField(choices=FeedType.choices, max_length=12, null=False, editable=False, help_text="type of feed")
+    pretty_url = models.URLField(max_length=1000, null=True, default=None)
 
     def get_post_count(self):
         return self.posts.count()
@@ -64,6 +66,9 @@ class Feed(models.Model):
         if not self.id:
             self.id = stix_id(self.url)
         return super().save(*args, **kwargs)
+    
+    def get_pretty_url(self):
+        return self.pretty_url or self.url
 
 class Job(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, help_text="UUID of job")

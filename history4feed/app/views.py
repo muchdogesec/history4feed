@@ -20,8 +20,8 @@ from .utils import (
 from dogesec_commons.utils.serializers import CommonErrorSerializer
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import FeedCreateSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
-from .models import FulltextJob, Post, Feed, Job
+from .serializers import FeedCreatedJobSerializer, FeedPatchSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
+from .models import FulltextJob, Post, Feed, Job, FeedType
 from rest_framework import (
     viewsets,
     request,
@@ -39,6 +39,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
     OpenApiResponse,
     OpenApiExample,
+    PolymorphicProxySerializer,
 )
 from drf_spectacular.types import OpenApiTypes
 from django_filters.rest_framework import (
@@ -297,34 +298,70 @@ class FeedView(viewsets.ModelViewSet):
         ),
         tags=open_api_tags,
         responses={
-            201: FeedCreateSerializer,
+            201: FeedCreatedJobSerializer,
             400: OpenApiResponse(CommonErrorSerializer, "Bad request", examples=[HTTP400_EXAMPLE]),
             406: OpenApiResponse(CommonErrorSerializer, "Invalid feed url", examples=[OpenApiExample(name="http-406", value={"detail": "invalid feed url", "code": 406})]),
         },
+        request=FeedSerializer,
     )
     def create(self, request: request.Request, **kwargs):
-        s = self.serializer_class(data=request.data)
+
+        s = FeedSerializer(data=request.data)
         s.is_valid(raise_exception=True)
+
         profile_id = request.data.get('profile_id')
         try:
-            feed = h4f.parse_feed_from_url(s.data["url"])
+            feed_data = h4f.parse_feed_from_url(s.data["url"])
         except Exception as e:
             return ErrorResp(406, "Invalid feed url", details={"error": str(e)})
-        s.run_validation({**feed, 'profile_id': profile_id})
-        feed_obj: Feed = s.create(validated_data=feed)
+        
+        for k in ['title', 'description']:
+            if v := s.validated_data.get(k):
+                feed_data[k] = v
+
+        s.run_validation({**feed_data, 'profile_id': profile_id})
+        feed_obj: Feed = s.create(validated_data=feed_data)
         job_obj = task_helper.new_job(feed_obj, profile_id, s.validated_data.get('include_remote_blogs', False))
 
-        feed = self.serializer_class(feed_obj).data.copy()
-        feed.update(
+        resp_data = self.serializer_class(feed_obj).data.copy()
+        resp_data.update(
             job_state=job_obj.state,
             job_id=job_obj.id,
         )
-        return Response(feed, status=status.HTTP_201_CREATED)
+        return Response(resp_data, status=status.HTTP_201_CREATED)
 
+
+    @extend_schema(
+        summary="Create a new Skeleton Feed",
+        description=textwrap.dedent(
+            """
+        Use this endpoint to create to a new feed.\n\n
+        The following key/values are accepted in the body of the request:\n\n
+        * `pretty_url` (required): a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned.\n\n
+        * `description` (required): blah blah.\n\n
+        * `title` (required): blah blah.\n\n
+
+        The response will return the created feed object.
+        """
+        ),
+        tags=open_api_tags,
+        responses={
+            201: SkeletonFeedSerializer,
+            400: OpenApiResponse(CommonErrorSerializer, "Bad request", examples=[HTTP400_EXAMPLE]),
+        },
+        request=SkeletonFeedSerializer,
+    )
+    @decorators.action(methods=['POST'], detail=False)
+    def skeleton(self, request: request.Request, **kwargs):
+        s = SkeletonFeedSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        instance = s.save()
+        return Response(FeedSerializer(instance).data, status=status.HTTP_201_CREATED)
+    
     @extend_schema(
         parameters=[FEED_ID_PARAM],
         summary="Update a Feed",
-        request=PatchSerializer,
+        request=FeedPatchSerializer,
         description=textwrap.dedent(
             """
             Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.\n\n
@@ -337,22 +374,26 @@ class FeedView(viewsets.ModelViewSet):
         ),
         tags=open_api_tags,
         responses={
-            201: FeedCreateSerializer,
+            201: PolymorphicProxySerializer(component_name="PatchFeedResponse", resource_type_field_name=None, serializers=[FeedCreatedJobSerializer, FeedSerializer]),
             400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
             (404, "application/json"): OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
         },
     )
     def partial_update(self, request, *args, **kwargs):
-        s = PatchSerializer(data=request.data)
-        s.is_valid(raise_exception=True)
         feed_obj: Feed = self.get_object()
-        job_obj = task_helper.new_job(feed_obj, s.data['profile_id'], s.validated_data.get('include_remote_blogs', False))
-        feed = self.serializer_class(feed_obj).data.copy()
+        s = FeedPatchSerializer(feed_obj, data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        s.save()
+        if feed_obj.feed_type == FeedType.SKELETON:
+            feed = FeedSerializer(s.instance).data
+        else:
+            job_obj = task_helper.new_job(feed_obj, s.data['profile_id'], s.validated_data.get('include_remote_blogs', False))
+            feed = self.serializer_class(feed_obj).data.copy()
 
-        feed.update(
-            job_state=job_obj.state,
-            job_id=job_obj.id,
-        )
+            feed.update(
+                job_state=job_obj.state,
+                job_id=job_obj.id,
+            )
         return Response(feed, status=status.HTTP_201_CREATED)
 
     @extend_schema(
