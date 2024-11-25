@@ -48,6 +48,8 @@ from django_filters.rest_framework import (
     Filter,
     BaseCSVFilter,
     UUIDFilter,
+    BaseInFilter,
+    filters,
 )
 from django.db.models import Count, Q, Subquery, OuterRef
 from datetime import datetime
@@ -115,14 +117,14 @@ class PostView(
 
     class filterset_class(FilterSet):
         title = Filter(
-            label="Filter by the content in a posts title. Will search for titles that contain the value entered.",
+            help_text="Filter by the content in a posts title. Will search for titles that contain the value entered.",
             lookup_expr="search",
         )
         description = Filter(
-            label="Filter by the content in a posts description. Will search for descriptions that contain the value entered.",
+            help_text="Filter by the content in a posts description. Will search for descriptions that contain the value entered.",
             lookup_expr="search",
         )
-        job_id = Filter(label="Filter the Post by Job ID the Post was downloaded in.", field_name="fulltext_jobs__job_id")
+        job_id = Filter(help_text="Filter the Post by Job ID the Post was downloaded in.", field_name="fulltext_jobs__job_id")
 
     def get_queryset(self):
         subquery = FulltextJob.objects.filter(post_id=OuterRef('pk')).order_by('-job__run_datetime').values('job__profile_id')[:1]
@@ -263,21 +265,26 @@ class FeedView(viewsets.ModelViewSet):
 
     class filterset_class(FilterSet):
         title = Filter(
-            label="Filter by the content in feed title. Will search for titles that contain the value entered.",
+            help_text="Filter by the content in feed title. Will search for titles that contain the value entered.",
             lookup_expr="search",
         )
         description = Filter(
-            label="Filter by the content in feed description. Will search for descriptions that contain the value entered.",
+            help_text="Filter by the content in feed description. Will search for descriptions that contain the value entered.",
             lookup_expr="search",
         )
         url = Filter(
-            label="Filter by the content in a feeds URL. Will search for URLs that contain the value entered.",
+            help_text="Filter by the content in a feeds URL. Will search for URLs that contain the value entered.",
             lookup_expr="icontains",
         )
         id = BaseCSVFilter(
-            label="Filter by feed id(s), comma-separated, e.g 6c6e6448-04d4-42a3-9214-4f0f7d02694e,2bce5b30-7014-4a5d-ade7-12913fe6ac36",
+            help_text="Filter by feed id(s), comma-separated, e.g 6c6e6448-04d4-42a3-9214-4f0f7d02694e,2bce5b30-7014-4a5d-ade7-12913fe6ac36",
             lookup_expr="in",
         )
+        feed_type = filters.MultipleChoiceFilter(
+            help_text="Filter by feed_type",
+            choices=FeedType.choices,
+        )
+
 
     def get_queryset(self):
         return Feed.objects.all().annotate(count_of_posts=Count("posts"))
@@ -465,10 +472,10 @@ class JobView(
 
     class filterset_class(FilterSet):
         feed_id = Filter(
-            label="Filter Jobs by the ID of the Feed they belong to. You can search for Feed IDs using the GET Feeds endpoints. Note a Feed can have multiple jobs associated with it where a PATCH request has been run to update the Feed."
+            help_text="Filter Jobs by the ID of the Feed they belong to. You can search for Feed IDs using the GET Feeds endpoints. Note a Feed can have multiple jobs associated with it where a PATCH request has been run to update the Feed."
         )
-        state = Filter(label="Filter by the status of a Job")
-        post_id = UUIDFilter(label="Filter Jobs by the ID of the Post they belong to. You can search for Post IDs using the GET Posts endpoint. Note a Post can have multiple jobs associated with it where a PATCH request has been run to update a Feed or a Post.", field_name="fulltext_jobs__post_id")
+        state = Filter(help_text="Filter by the status of a Job")
+        post_id = UUIDFilter(help_text="Filter Jobs by the ID of the Post they belong to. You can search for Post IDs using the GET Posts endpoint. Note a Post can have multiple jobs associated with it where a PATCH request has been run to update a Feed or a Post.", field_name="fulltext_jobs__post_id")
 
     def get_queryset(self):
         return Job.objects.all().annotate(count_of_items=Count("fulltext_jobs"))
