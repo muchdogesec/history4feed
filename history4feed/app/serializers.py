@@ -7,7 +7,7 @@ class FeedSerializer(serializers.ModelSerializer):
     count_of_posts = serializers.IntegerField(source='get_post_count', read_only=True, help_text="Number of posts in feed")
     profile_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
     include_remote_blogs = serializers.BooleanField(write_only=True, default=False)
-    pretty_url = serializers.URLField(required=False, help_text="This is a cosmetic URL. It is designed to show the actual blog link to browse to in a web browser (not the feed)")
+    pretty_url = serializers.URLField(allow_null=True, required=False, help_text="This is a cosmetic URL. It is designed to show the actual blog link to browse to in a web browser (not the feed)")
     title = serializers.CharField(required=False)
     description = serializers.CharField(required=False)
     class Meta:
