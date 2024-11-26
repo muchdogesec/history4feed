@@ -20,6 +20,15 @@ from .app import views
 from rest_framework import routers
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
+
+from django.http import JsonResponse
+def handler404(*args, **kwargs):
+    return JsonResponse(dict(code=404, message='non-existent page'))
+
+def handler500(*args, **kwargs):
+    return JsonResponse(dict(code=500, message='internal server error'))
+
+
 API_VERSION = "v1"
 
 router = routers.SimpleRouter(use_regex_path=False)
