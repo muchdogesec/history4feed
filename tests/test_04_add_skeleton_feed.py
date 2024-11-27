@@ -7,7 +7,7 @@ import argparse
 class BaseTest(unittest.TestCase):
     def setUp(self):
         # Define the base URL for the API requests
-        self.base_url = "http://127.0.0.1:8002/api/v1/feeds/skeleton"
+        self.base_url = "http://127.0.0.1:8002/api/v1/feeds/skeleton/"
 
         # Feeds URLs, their corresponding feed IDs, descriptions, and feed types
         self.feeds = {

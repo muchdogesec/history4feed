@@ -17,7 +17,7 @@ class BaseTest(unittest.TestCase):
                 "feed_type": "rss", # not passed in request
                 "include_remote_blogs": False
             },
-            # custom title/description
+            # custom title/description/pretty_url
             "https://muchdogesec.github.io/fakeblog123/feeds/atom-feed-decoded.xml": {
                 "id": "cb0ba709-b841-521a-a3f2-5e1429f4d366", # not passed in request
                 "feed_type": "atom", # not passed in request

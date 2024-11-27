@@ -382,11 +382,21 @@ class FeedView(viewsets.ModelViewSet):
     
     @extend_schema(
         parameters=[FEED_ID_PARAM],
-        summary="Update a Feed's properties",
+        summary="Update a Feeds properties",
         request=FeedPatchSerializer,
         description=textwrap.dedent(
             """
-                Update Feed's title and/or description
+            Update the metadata of the Feed. To leave a property unchanged from its current state do not pass it in the request.
+
+            Note, it is not possible to update the `url` of the feed. You must delete the Feed and add it again to modify the `url`.
+
+            The following key/values are accepted in the body of the request:
+
+            * `title` (optional): update the `title` of the Feed
+            * `description` (optional): update the `description` of the Feed
+            * `pretty_url` (optional): update the `pretty_url of the Feed
+
+            The response will contain the newly update Feed object.
             """
         ),
         responses={
@@ -404,11 +414,19 @@ class FeedView(viewsets.ModelViewSet):
     
     @extend_schema(
         parameters=[FEED_ID_PARAM],
-        summary="Fetch new posts on feed",
+        summary="Fetch new Post for a Feed",
         request=FeedFetchSerializer,
         description=textwrap.dedent(
             """
-                Fetch new posts
+            Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.
+
+            Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.
+
+            The following key/values are accepted in the body of the request:
+
+            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
+
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
             """
         ),
         responses={
