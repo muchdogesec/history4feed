@@ -89,8 +89,9 @@ def retrieve_posts_from_links(urls, job_id):
         full_text_chain = celery.chain(chain_tasks)
         chains.append(full_text_chain.apply_async())
 
-    for k, v in parsed_feed.items():
-        setattr(feed, k, v)
+    feed.set_description(parsed_feed['description'])
+    feed.set_title(parsed_feed['title'])
+    
     feed.save()
     logger.info("====\n"*20)
     return [result.id for result in chains]

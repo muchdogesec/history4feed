@@ -1,15 +1,23 @@
 from rest_framework import serializers, validators
-from .models import Category, Feed, Post, Job, normalize_url, FeedType
+from .models import AUTO_TITLE_TRAIL, FEED_DESCRIPTION_MAX_LENGTH, Category, Feed, Post, Job, normalize_url, FeedType
 from django.db import models as django_models
 from django.utils.translation import gettext_lazy as _
+
+class TitleField(serializers.CharField):
+    def to_internal_value(self, data):
+        return super().to_internal_value(data)
+    def to_representation(self, value):
+        value = super().to_representation(value)
+        if value.endswith(AUTO_TITLE_TRAIL):
+            value = value[:len(AUTO_TITLE_TRAIL)]
 
 class FeedSerializer(serializers.ModelSerializer):
     count_of_posts = serializers.IntegerField(source='get_post_count', read_only=True, help_text="Number of posts in feed")
     profile_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
     include_remote_blogs = serializers.BooleanField(write_only=True, default=False)
     pretty_url = serializers.URLField(allow_null=True, required=False, help_text="This is a cosmetic URL. It is designed to show the actual blog link to browse to in a web browser (not the feed)")
-    title = serializers.CharField(required=False)
-    description = serializers.CharField(required=False)
+    title = TitleField(required=False, max_length=256)
+    description = TitleField(required=False, max_length=FEED_DESCRIPTION_MAX_LENGTH)
     class Meta:
         model = Feed
         fields = '__all__'
@@ -53,13 +61,18 @@ class PatchSerializer(serializers.Serializer):
     profile_id = serializers.UUIDField(required=False, default=None)
 
 class FeedPatchSerializer(serializers.ModelSerializer):
-    profile_id = serializers.UUIDField(required=False, default=None)
     title = serializers.CharField(required=True, help_text="title of feed")
     description = serializers.CharField(required=True, help_text="description of feed")
 
     class Meta:
         model = Feed
-        fields = ['profile_id', 'title', 'description']
+        fields = ['title', 'description']
+
+class FeedFetchSerializer(FeedPatchSerializer):
+    profile_id = serializers.UUIDField(required=False, default=None)
+    class Meta:
+        model = Feed
+        fields = ['profile_id']
 
 class PostCreateSerializer(PostSerializer):
     # feed_id = serializers.UUIDField(source='feed')

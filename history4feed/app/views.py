@@ -20,8 +20,8 @@ from .utils import (
 from dogesec_commons.utils.serializers import CommonErrorSerializer
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import FeedCreatedJobSerializer, FeedPatchSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
-from .models import FulltextJob, Post, Feed, Job, FeedType
+from .serializers import FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
+from .models import AUTO_TITLE_TRAIL, FulltextJob, Post, Feed, Job, FeedType
 from rest_framework import (
     viewsets,
     request,
@@ -31,6 +31,7 @@ from rest_framework import (
     renderers,
     pagination,
     status,
+    validators,
 )
 from django.http import HttpResponse
 from ..h4fscripts import h4f, task_helper, build_rss
@@ -39,7 +40,6 @@ from drf_spectacular.utils import (
     extend_schema_view,
     OpenApiResponse,
     OpenApiExample,
-    PolymorphicProxySerializer,
 )
 from drf_spectacular.types import OpenApiTypes
 from django_filters.rest_framework import (
@@ -102,7 +102,6 @@ class ErrorResp(Response):
             201: PostJobSerializer,
             404: OpenApiResponse(CommonErrorSerializer, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
         },
-        tags=["Feeds"],
         request=PatchSerializer,
     ),
 )
@@ -110,7 +109,7 @@ class PostView(
     mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
 ):
 
-    open_api_tags = ["Feeds"]
+    openapi_tags = ["Feeds"]
     serializer_class = PostSerializer
     lookup_url_kwarg = "post_id"
     pagination_class = Pagination("posts")
@@ -143,7 +142,6 @@ class PostView(
             Use this endpoint with your feed reader. The response of this endpoint is valid RSS XML for the Posts in the Feed. If you want more flexibility (perhaps to build a custom integration) use the JSON version of this endpoint.
             """
         ),
-        tags=open_api_tags,
         responses={
             200: XML_RESPONSE,
             (404, "application/json"): OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
@@ -171,7 +169,6 @@ class PostView(
             Use this endpoint if you want to search through all Posts in a Feed. The response of this endpoint is JSON, and is useful if you're building a custom integration to a downstream tool. If you just want to import the data for this blog into your feed reader use the RSS version of this endpoint.
             """
         ),
-        tags=open_api_tags,
         responses={
             200: PostSerializer,
             404: OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
@@ -189,7 +186,6 @@ class PostView(
             This will return a single Post in a Feed using its ID. It is useful if you only want to get the data for a single entry.
             """
         ),
-        tags=open_api_tags,
         responses={
             200: PostSerializer,
             404: OpenApiResponse(CommonErrorSerializer, "Feed or post not found", examples=[HTTP404_EXAMPLE]),
@@ -236,7 +232,6 @@ class PostView(
             201: PostJobSerializer,
             404: OpenApiResponse(CommonErrorSerializer, "Feed does not exist", examples=[HTTP404_EXAMPLE]),
         },
-        tags=["Feeds"],
     )
     def create(self, request, *args, feed_id=None, **kwargs):
         feed_obj = get_object_or_404(Feed.objects, id=feed_id)
@@ -253,7 +248,7 @@ class PostView(
 
 
 class FeedView(viewsets.ModelViewSet):
-    open_api_tags = ["Feeds"]
+    openapi_tags = ["Feeds"]
     serializer_class = FeedSerializer
     queryset = Feed.objects.all()
     lookup_url_kwarg = "feed_id"
@@ -320,7 +315,6 @@ class FeedView(viewsets.ModelViewSet):
             The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
             """
         ),
-        tags=open_api_tags,
         responses={
             201: FeedCreatedJobSerializer,
             400: OpenApiResponse(CommonErrorSerializer, "Bad request", examples=[HTTP400_EXAMPLE]),
@@ -342,6 +336,8 @@ class FeedView(viewsets.ModelViewSet):
         for k in ['title', 'description']:
             if v := s.validated_data.get(k):
                 feed_data[k] = v
+            else:
+                feed_data[k] = feed_data[k] + AUTO_TITLE_TRAIL
 
         s.run_validation({**feed_data, 'profile_id': profile_id})
         feed_obj: Feed = s.create(validated_data=feed_data)
@@ -371,7 +367,6 @@ class FeedView(viewsets.ModelViewSet):
             The response will return the created Feed object with the Feed `id`.
             """
         ),
-        tags=open_api_tags,
         responses={
             201: SkeletonFeedSerializer,
             400: OpenApiResponse(CommonErrorSerializer, "Bad request", examples=[HTTP400_EXAMPLE]),
@@ -387,33 +382,15 @@ class FeedView(viewsets.ModelViewSet):
     
     @extend_schema(
         parameters=[FEED_ID_PARAM],
-        summary="Update a Feed",
+        summary="Update a Feed's properties",
         request=FeedPatchSerializer,
         description=textwrap.dedent(
             """
-            Use this endpoint to update a feed. This includes checking for new posts on this blog since the last update time (for `feed_type` `rss` and `atom` only) and/or updating various properties of the feed (`title`, `description`, `pretty_url`, `profile_id`).
-
-            An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint for `feed_type` `rss` and `atom`.
-
-            Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.
-
-            You can also use this endpoint to update the details of the feed. If no values are passed, the properties will not be changed (`title`, `description`, `pretty_url`, `profile_id`).
-
-            The following key/values are accepted in the body of the request:
-
-            * `pretty_url` (optional): change the `pretty_url` of the feed
-            * `title` (optional): change the `title` of the feed
-            * `description` (optional): change the `description` of the feed
-            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
-
-            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
-
-            Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).
+                Update Feed's title and/or description
             """
         ),
-        tags=open_api_tags,
         responses={
-            201: PolymorphicProxySerializer(component_name="PatchFeedResponse", resource_type_field_name=None, serializers=[FeedCreatedJobSerializer, FeedSerializer]),
+            201: FeedSerializer,
             400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
             (404, "application/json"): OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
         },
@@ -423,16 +400,37 @@ class FeedView(viewsets.ModelViewSet):
         s = FeedPatchSerializer(feed_obj, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
         s.save()
+        return Response(self.serializer_class(feed_obj).data, status=status.HTTP_201_CREATED)
+    
+    @extend_schema(
+        parameters=[FEED_ID_PARAM],
+        summary="Fetch new posts on feed",
+        request=FeedFetchSerializer,
+        description=textwrap.dedent(
+            """
+                Fetch new posts
+            """
+        ),
+        responses={
+            201: FeedCreatedJobSerializer,
+            400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
+            (404, "application/json"): OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
+        },
+    )
+    @decorators.action(methods=["PATCH"], detail=True)
+    def fetch(self, request, *args, **kwargs):
+        feed_obj: Feed = self.get_object()
         if feed_obj.feed_type == FeedType.SKELETON:
-            feed = FeedSerializer(s.instance).data
-        else:
-            job_obj = task_helper.new_job(feed_obj, s.data['profile_id'], s.validated_data.get('include_remote_blogs', False))
-            feed = self.serializer_class(feed_obj).data.copy()
-
-            feed.update(
-                job_state=job_obj.state,
-                job_id=job_obj.id,
-            )
+            raise validators.ValidationError(f"fetch not supported for feed of type {feed_obj.feed_type}")
+        s = FeedFetchSerializer(feed_obj, data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        s.save()
+        job_obj = task_helper.new_job(feed_obj, s.data['profile_id'], s.validated_data.get('include_remote_blogs', False))
+        feed = self.serializer_class(feed_obj).data.copy()
+        feed.update(
+            job_state=job_obj.state,
+            job_id=job_obj.id,
+        )
         return Response(feed, status=status.HTTP_201_CREATED)
 
     @extend_schema(
@@ -442,7 +440,6 @@ class FeedView(viewsets.ModelViewSet):
             Use this endpoint to get a list of all the feeds you are currently subscribed to. This endpoint is usually used to get the id of feed you want to get blog post data for in a follow up request to the GET Feed Posts endpoints or to get the status of a job related to the Feed in a follow up request to the GET Job endpoint. If you already know the id of the Feed already, you can use the GET Feeds by ID endpoint.
             """
         ),
-        tags=open_api_tags,
         responses={
             200: FeedSerializer,
             400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
@@ -459,7 +456,6 @@ class FeedView(viewsets.ModelViewSet):
             Use this endpoint to get information about a specific feed using its ID. You can search for a Feed ID using the GET Feeds endpoint, if required.
             """
         ),
-        tags=open_api_tags,
         responses={
             200: FeedSerializer,
             404: OpenApiResponse(CommonErrorSerializer, "Not found", examples=[HTTP404_EXAMPLE]),
@@ -476,7 +472,6 @@ class FeedView(viewsets.ModelViewSet):
             Use this endpoint to delete a feed using its ID. This will delete all posts (items) that belong to the feed and cannot be reversed.
             """
         ),
-        tags=open_api_tags,
         responses={
             200: {},
             404: OpenApiResponse(
@@ -498,7 +493,7 @@ class JobView(
     filter_backends = [DjangoFilterBackend, Ordering]
     ordering_fields = ["run_datetime", "state"]
     ordering = ["-run_datetime"]
-    open_api_tags = ["Jobs"]
+    openapi_tags = ["Jobs"]
     lookup_url_kwarg = "job_id"
     lookup_field = "id"
 
@@ -522,7 +517,6 @@ class JobView(
             Jobs track the status of the request to get posts for Feeds. For every new Feed added and every update to a Feed requested a job will be created. The `id` of a job is printed in the POST and PATCH responses respectively, but you can use this endpoint to search for the id again, if required.
             """
         ),
-        tags=open_api_tags,
         responses={
             200: JobSerializer,
             400: OpenApiResponse(
@@ -543,7 +537,6 @@ class JobView(
             Using a Job ID you can retrieve information about its state via this endpoint. This is useful to see if a Job to get data is complete, how many posts were imported in the job, or if an error has occurred.
             """
         ),
-        tags=open_api_tags,
         responses={
             200: JobSerializer,
             404: OpenApiResponse(
