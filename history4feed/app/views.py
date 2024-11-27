@@ -138,7 +138,7 @@ class PostView(
         ),
         tags=open_api_tags,
         responses={
-            200: XML_RESPONSE,
+            (200, RSSRenderer.media_type): XML_RESPONSE,
             (404, "application/json"): OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
             (400, "application/json"): OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
@@ -147,7 +147,7 @@ class PostView(
         methods=["get"],
         detail=False,
         pagination_class=XMLPostPagination("xml_posts"),
-        renderer_classes=[RSSRenderer],
+        renderer_classes=[RSSRenderer, renderers.JSONRenderer],
     )
     def xml(self, request: request.Request, *args, feed_id=None, **kwargs):
         feed_obj = get_object_or_404(Feed, id=feed_id)
