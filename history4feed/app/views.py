@@ -211,7 +211,7 @@ class PostView(
     
     @extend_schema(
         parameters=[FEED_ID_PARAM],
-        summary="Backfill a Post in a Feed",
+        summary="Add a Post manually to a Feed",
         description=textwrap.dedent(
             """
             This endpoint allows you to add Posts manually to a Feed. This endpoint is designed to ingest posts that are not identified by the Wayback Machine (used by the POST Feed endpoint during ingestion). If the feed you want to add a post to does not already exist, you should first add it using the POST Feed endpoint.
@@ -306,14 +306,12 @@ class FeedView(viewsets.ModelViewSet):
 
             The following key/values are accepted in the body of the request:
 
-            * `url` (required): a valid RSS or ATOM feed URL. If you are not using a valid URL, you must pass `feed_type` as `skeleton` in the request.
-            * `feed_type` (optional): if you are not using a valid RSS or ATOM feed URL in the `url` you must pass `skeleton` as the value here. Note, no other value but `skeleton` is accepted for this property.
+            * `url` (required): a valid RSS or ATOM feed URL.  If it is not valid, the Feed will not be created and an error returned. You can use the skeleton endpoint to create a feed from a non RSS/ATOM URL.
             * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to false. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.
             * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
             * `pretty_url` (optional): you can also inlude a secondary URL in the database. This is designed to be used to show the link to the blog (not the RSS/ATOM) feed so that a user can navigate to the blog in their browser.
-            * `title` (required if skeleton mode, optional otherwise): if using an RSS/ATOM feed URL, the title of the feed will be used. You can also manually pass the title of the blog here.
-            * `description` (optional otherwise): if using an RSS/ATOM feed URL, the description of the feed will be used. You can also manually pass the description of the blog here.
-
+            * `title` (optional): the title of the feed will be used if not passed. You can also manually pass the title of the blog here.
+            * `description` (optional): the description of the feed will be used if not passed. You can also manually pass the description of the blog here.
 
             The `id` of a Feed is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used is `<FEED_URL>` (e.g. `https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-encoded.xml` would have the id `d1d96b71-c687-50db-9d2b-d0092d1d163a`). Therefore, you cannot add a URL that already exists, you must first delete it to add it with new settings.
 
@@ -361,15 +359,16 @@ class FeedView(viewsets.ModelViewSet):
         summary="Create a new Skeleton Feed",
         description=textwrap.dedent(
             """
-            Use this endpoint to create to a new feed.
+            Sometimes blogs don't have an RSS or ATOM feed. It might also be the case you want to curate a blog manually using various URLs. This is what `skeleton` feeds are designed for, allowing you to create a skeleton feed and then add posts to it manually later on using the add post manually endpoint.
 
             The following key/values are accepted in the body of the request:
 
-            * `pretty_url` (required): a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned.
-            * `description` (required): blah blah.
-            * `title` (required): blah blah.
+            * `url` (required): the URL to be attached to the feed. Needs to be a URL (because this is what feed ID is generated from), however does not need to be valid.
+            * `pretty_url` (optional): you can also inlude a secondary URL in the database. This is designed to be used to show the link to the blog (not the RSS/ATOM) feed so that a user can navigate to the blog in their browser.
+            * `title` (required): the title of the feed
+            * `description` (optional): the description of the feed
 
-            The response will return the created feed object.
+            The response will return the created Feed object with the Feed `id`.
             """
         ),
         tags=open_api_tags,
