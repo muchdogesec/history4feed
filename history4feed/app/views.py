@@ -86,10 +86,14 @@ class ErrorResp(Response):
     partial_update=extend_schema(
         description=textwrap.dedent(
             """
-            Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.\n\n
-            The following key/values are accepted in the body of the request:\n\n        
-            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
-            IMPORTANT: This action will delete the original post content making it irretrievable,\n\n
+            Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.
+
+            The following key/values are accepted in the body of the request:
+
+            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
+
+            IMPORTANT: This action will delete the original post content making it irretrievable.
+
             The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
             """
         ),
@@ -136,8 +140,8 @@ class PostView(
         summary="Search for Posts in a Feed (RSS)",
         description=textwrap.dedent(
             """
-        Use this endpoint with your feed reader. The response of this endpoint is valid RSS XML for the Posts in the Feed. If you want more flexibility (perhaps to build a custom integration) use the JSON version of this endpoint.
-        """
+            Use this endpoint with your feed reader. The response of this endpoint is valid RSS XML for the Posts in the Feed. If you want more flexibility (perhaps to build a custom integration) use the JSON version of this endpoint.
+            """
         ),
         tags=open_api_tags,
         responses={
@@ -164,8 +168,8 @@ class PostView(
         summary="Search for Posts in a Feed (JSON)",
         description=textwrap.dedent(
             """
-        Use this endpoint if you want to search through all Posts in a Feed. The response of this endpoint is JSON, and is useful if you're building a custom integration to a downstream tool. If you just want to import the data for this blog into your feed reader use the RSS version of this endpoint.
-        """
+            Use this endpoint if you want to search through all Posts in a Feed. The response of this endpoint is JSON, and is useful if you're building a custom integration to a downstream tool. If you just want to import the data for this blog into your feed reader use the RSS version of this endpoint.
+            """
         ),
         tags=open_api_tags,
         responses={
@@ -182,8 +186,8 @@ class PostView(
         summary="Get a Post in a Feed",
         description=textwrap.dedent(
             """
-        This will return a single Post in a Feed using its ID. It is useful if you only want to get the data for a single entry.
-        """
+            This will return a single Post in a Feed using its ID. It is useful if you only want to get the data for a single entry.
+            """
         ),
         tags=open_api_tags,
         responses={
@@ -210,16 +214,21 @@ class PostView(
         summary="Backfill a Post in a Feed",
         description=textwrap.dedent(
             """
-            This endpoint allows you to add Posts manually to a Feed. This endpoint is designed to ingest posts that are not identified by the Wayback Machine (used by the POST Feed endpoint during ingestion). If the feed you want to add a post to does not already exist, you should first add it using the POST Feed endpoint.\n\n
-            The following key/values are accepted in the body of the request:\n\n
-            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
-            * `link` (required - must be unique): The URL of the blog post. This is where the content of the post is found. It cannot be the same as the `url` of a post already in this feed. If you want to update the post, use the PATCH post endpoint.\n\n
-            * `pubdate` (required): The date of the blog post in the format `YYYY-MM-DDTHH:MM:SS.sssZ`. history4feed cannot accurately determine a post date in all cases, so you must enter it manually.\n\n
-            * `title` (required):  history4feed cannot accurately determine the title of a post in all cases, so you must enter it manually.\n\n
+            This endpoint allows you to add Posts manually to a Feed. This endpoint is designed to ingest posts that are not identified by the Wayback Machine (used by the POST Feed endpoint during ingestion). If the feed you want to add a post to does not already exist, you should first add it using the POST Feed endpoint.
+
+            The following key/values are accepted in the body of the request:
+
+            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
+            * `link` (required - must be unique): The URL of the blog post. This is where the content of the post is found. It cannot be the same as the `url` of a post already in this feed. If you want to update the post, use the PATCH post endpoint.
+            * `pubdate` (required): The date of the blog post in the format `YYYY-MM-DDTHH:MM:SS.sssZ`. history4feed cannot accurately determine a post date in all cases, so you must enter it manually.
+            * `title` (required):  history4feed cannot accurately determine the title of a post in all cases, so you must enter it manually.
             * `author` (optional): the value to be stored for the author of the post.
-            * `categories` (optional) : the value(s) to be stored for the category of the post. Pass as a list like `["tag1","tag2"]`.\n\n
-            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.\n\n
-            Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).\n\n
+            * `categories` (optional) : the value(s) to be stored for the category of the post. Pass as a list like `["tag1","tag2"]`.
+
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+
+            Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).
+
             _Note: We do have a proof-of-concept to scrape a site for all blog post urls, titles, and pubdate called [sitemap2posts](https://github.com/muchdogesec/sitemap2posts) which can help form the request body needed for this endpoint._
             """
         ),
@@ -293,15 +302,25 @@ class FeedView(viewsets.ModelViewSet):
         summary="Create a new Feed",
         description=textwrap.dedent(
             """
-        Use this endpoint to create to a new feed.\n\n
-        The following key/values are accepted in the body of the request:\n\n
-        * `url` (required): a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned.\n\n
-        * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to false. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.\n\n
-        * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
-        The `id` of a Feed is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used is `<FEED_URL>` (e.g. `https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-encoded.xml` would have the id `d1d96b71-c687-50db-9d2b-d0092d1d163a`). Therefore, you cannot add a URL that already exists, you must first delete it to add it with new settings.\n\n
-        Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).\n\n
-        The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
-        """
+            Use this endpoint to create to a new feed.
+
+            The following key/values are accepted in the body of the request:
+
+            * `url` (required): a valid RSS or ATOM feed URL. If you are not using a valid URL, you must pass `feed_type` as `skeleton` in the request.
+            * `feed_type` (optional): if you are not using a valid RSS or ATOM feed URL in the `url` you must pass `skeleton` as the value here. Note, no other value but `skeleton` is accepted for this property.
+            * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to false. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.
+            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
+            * `pretty_url` (optional): you can also inlude a secondary URL in the database. This is designed to be used to show the link to the blog (not the RSS/ATOM) feed so that a user can navigate to the blog in their browser.
+            * `title` (required if skeleton mode, optional otherwise): if using an RSS/ATOM feed URL, the title of the feed will be used. You can also manually pass the title of the blog here.
+            * `description` (optional otherwise): if using an RSS/ATOM feed URL, the description of the feed will be used. You can also manually pass the description of the blog here.
+
+
+            The `id` of a Feed is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used is `<FEED_URL>` (e.g. `https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-encoded.xml` would have the id `d1d96b71-c687-50db-9d2b-d0092d1d163a`). Therefore, you cannot add a URL that already exists, you must first delete it to add it with new settings.
+
+            Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).
+
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+            """
         ),
         tags=open_api_tags,
         responses={
@@ -342,14 +361,16 @@ class FeedView(viewsets.ModelViewSet):
         summary="Create a new Skeleton Feed",
         description=textwrap.dedent(
             """
-        Use this endpoint to create to a new feed.\n\n
-        The following key/values are accepted in the body of the request:\n\n
-        * `pretty_url` (required): a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned.\n\n
-        * `description` (required): blah blah.\n\n
-        * `title` (required): blah blah.\n\n
+            Use this endpoint to create to a new feed.
 
-        The response will return the created feed object.
-        """
+            The following key/values are accepted in the body of the request:
+
+            * `pretty_url` (required): a valid RSS or ATOM feed URL. If it is not valid, the Feed will not be created and an error returned.
+            * `description` (required): blah blah.
+            * `title` (required): blah blah.
+
+            The response will return the created feed object.
+            """
         ),
         tags=open_api_tags,
         responses={
@@ -371,11 +392,16 @@ class FeedView(viewsets.ModelViewSet):
         request=FeedPatchSerializer,
         description=textwrap.dedent(
             """
-            Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.\n\n
-            Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.\n\n
-            The following key/values are accepted in the body of the request:\n\n        
-            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.\n\n
-            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.\n\n
+            Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.
+
+            Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.
+
+            The following key/values are accepted in the body of the request:
+
+            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
+
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+
             Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).
             """
         ),
@@ -407,8 +433,8 @@ class FeedView(viewsets.ModelViewSet):
         summary="Search for Feeds",
         description=textwrap.dedent(
             """
-        Use this endpoint to get a list of all the feeds you are currently subscribed to. This endpoint is usually used to get the id of feed you want to get blog post data for in a follow up request to the GET Feed Posts endpoints or to get the status of a job related to the Feed in a follow up request to the GET Job endpoint. If you already know the id of the Feed already, you can use the GET Feeds by ID endpoint.
-        """
+            Use this endpoint to get a list of all the feeds you are currently subscribed to. This endpoint is usually used to get the id of feed you want to get blog post data for in a follow up request to the GET Feed Posts endpoints or to get the status of a job related to the Feed in a follow up request to the GET Job endpoint. If you already know the id of the Feed already, you can use the GET Feeds by ID endpoint.
+            """
         ),
         tags=open_api_tags,
         responses={
@@ -424,8 +450,8 @@ class FeedView(viewsets.ModelViewSet):
         summary="Get a Feed",
         description=textwrap.dedent(
             """
-        Use this endpoint to get information about a specific feed using its ID. You can search for a Feed ID using the GET Feeds endpoint, if required.
-        """
+            Use this endpoint to get information about a specific feed using its ID. You can search for a Feed ID using the GET Feeds endpoint, if required.
+            """
         ),
         tags=open_api_tags,
         responses={
@@ -441,8 +467,8 @@ class FeedView(viewsets.ModelViewSet):
         summary="Delete a Feed",
         description=textwrap.dedent(
             """
-        Use this endpoint to delete a feed using its ID. This will delete all posts (items) that belong to the feed and cannot be reversed.
-        """
+            Use this endpoint to delete a feed using its ID. This will delete all posts (items) that belong to the feed and cannot be reversed.
+            """
         ),
         tags=open_api_tags,
         responses={
@@ -487,8 +513,8 @@ class JobView(
         summary="Search Jobs",
         description=textwrap.dedent(
             """
-        Jobs track the status of the request to get posts for Feeds. For every new Feed added and every update to a Feed requested a job will be created. The `id` of a job is printed in the POST and PATCH responses respectively, but you can use this endpoint to search for the id again, if required.
-        """
+            Jobs track the status of the request to get posts for Feeds. For every new Feed added and every update to a Feed requested a job will be created. The `id` of a job is printed in the POST and PATCH responses respectively, but you can use this endpoint to search for the id again, if required.
+            """
         ),
         tags=open_api_tags,
         responses={
@@ -508,8 +534,8 @@ class JobView(
         summary="Get a Job",
         description=textwrap.dedent(
             """
-        Using a Job ID you can retrieve information about its state via this endpoint. This is useful to see if a Job to get data is complete, how many posts were imported in the job, or if an error has occurred.
-        """
+            Using a Job ID you can retrieve information about its state via this endpoint. This is useful to see if a Job to get data is complete, how many posts were imported in the job, or if an error has occurred.
+            """
         ),
         tags=open_api_tags,
         responses={
