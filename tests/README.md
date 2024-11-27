@@ -23,10 +23,10 @@ st run --checks all http://127.0.0.1:8001/api/schema --generation-allow-x00 true
 
 ## Automated Tests
 
-### Check different feed formats
+### Check RSS / ATOM Feeds
 
 ```shell
-python3 -m unittest tests/test_01_add_fakeblog123_feeds.py
+python3 tests/test_01_add_fakeblog123_atom_rss_feeds.py
 ```
 
 This contains 12 feed types, both ATOM and RSS feeds, all in three formats; 1) html encoded, 2) decoded, 3) with cdata tags.
@@ -45,6 +45,38 @@ Note, because we use a UUIDv5 ID (namespace `6c6e6448-04d4-42a3-9214-4f0f7d02694
 * posts: UUID generated from namespace and the value `<FEED_ID>+<POST_URL>+<POST_PUB_TIME>`
 	* e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`
 	* Note `<POST_PUB_TIME>` is reported in seconds, we generate the value used in UUID generation with sub-seconds (e.g. `2024-08-20T10:00:00Z` -> `2024-08-20T10:00:00.000000Z`)
+
+e.g.
+
+You can pass `--feed-url` to only run one test:
+
+minimum required properties
+
+```shell
+python3 tests/test_01_add_fakeblog123_atom_rss_feeds.py \
+	--feed-url https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-encoded.xml
+```
+
+custom title/description
+
+```shell
+python3 tests/test_01_add_fakeblog123_atom_rss_feeds.py \
+	--feed-url https://muchdogesec.github.io/fakeblog123/feeds/atom-feed-decoded.xml
+```
+
+using profile id
+
+```shell
+python3 tests/test_01_add_fakeblog123_atom_rss_feeds.py \
+	--feed-url https://muchdogesec.github.io/fakeblog123/feeds/atom-feed-cdata.xml
+```
+
+### Check Skeleton feed
+
+```shell
+python3 tests/test_01_add_fakeblog123_atom_rss_feeds.py
+```
+
 
 ### Test 3rd party blog
 

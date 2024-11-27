@@ -7,77 +7,19 @@ import argparse
 class BaseTest(unittest.TestCase):
     def setUp(self):
         # Define the base URL for the API requests
-        self.base_url = "http://127.0.0.1:8002/api/v1/feeds/"
+        self.base_url = "http://127.0.0.1:8002/api/v1/feeds/skeleton"
 
         # Feeds URLs, their corresponding feed IDs, descriptions, and feed types
         self.feeds = {
-            # minimum required properties
-            "https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-encoded.xml": {
-                "id": "d1d96b71-c687-50db-9d2b-d0092d1d163a", # not passed in request
-                "feed_type": "rss", # not passed in request
-                "include_remote_blogs": False
-            },
-            # custom title/description
-            "https://muchdogesec.github.io/fakeblog123/feeds/atom-feed-decoded.xml": {
-                "id": "cb0ba709-b841-521a-a3f2-5e1429f4d366", # not passed in request
-                "feed_type": "atom", # not passed in request
+            # all properties
+            "https://google.com": {
+                "id": "ff5ade78-3a65-5fe2-a914-530ef5bd0fd7", # not passed in request
+                "feed_type": "skeleton", # not passed in request
                 "pretty_url": "https://muchdogesec.github.io/fakeblog123/",
                 "title": "Custom Title",
-                "description": "Custom description",
-                "include_remote_blogs": False
+                "description": "Custom description"
             },
-            # using profile id
-            "https://muchdogesec.github.io/fakeblog123/feeds/atom-feed-cdata.xml": {
-                "id": "121e5557-7277-5aa3-945d-e466c6bf92d5", # not passed in request
-                "feed_type": "atom", # not passed in request
-                "profile_id": "7b6f7c33-563d-4d07-886b-f3e5bfcd81df",
-                "include_remote_blogs": False
-            },
-            "https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-decoded.xml": {
-                "id": "8f89731d-b9de-5931-9182-5460af59ca84", # not passed in request
-                "feed_type": "rss", # not passed in request
-                "include_remote_blogs": False
-            },
-            "https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-cdata.xml": {
-                "id": "c8592fca-aa7b-55b7-9664-886230d7c338", # not passed in request
-                "feed_type": "rss", # not passed in request
-                "include_remote_blogs": False
-            },
-            "https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-encoded-partial.xml": {
-                "id": "e6178850-0b78-54cc-9f3e-85b482b84f2b", # not passed in request
-                "feed_type": "rss", # not passed in request
-                "include_remote_blogs": False
-            },
-            "https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-decoded-partial.xml": {
-                "id": "8375e600-cc52-5823-8179-a8313ba9df5c", # not passed in request
-                "feed_type": "rss", # not passed in request
-                "include_remote_blogs": False
-            },
-            "https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-cdata-partial.xml": {
-                "id": "2d6575b8-3d90-5479-bdfe-b980b753ec40", # not passed in request
-                "feed_type": "rss", # not passed in request
-                "include_remote_blogs": False
-            },
-            "https://muchdogesec.github.io/fakeblog123/feeds/atom-feed-encoded.xml": { 
-                "id": "2f21dfd2-e776-5d2b-ad3d-00460e540cca", # not passed in request
-                "feed_type": "atom", # not passed in request
-                "include_remote_blogs": False
-            },
-            "https://muchdogesec.github.io/fakeblog123/feeds/atom-feed-encoded-partial.xml": {
-                "id": "66966023-522a-57af-93ac-88c6214e1891", # not passed in request
-                "feed_type": "atom", # not passed in request
-                "include_remote_blogs": False
-            },
-            "https://muchdogesec.github.io/fakeblog123/feeds/atom-feed-decoded-partial.xml": {
-                "id": "9c04d319-a949-52df-bcb6-5a73a1458fe5", # not passed in request
-                "feed_type": "atom", # not passed in request
-                "include_remote_blogs": False
-            },
-            "https://muchdogesec.github.io/fakeblog123/feeds/atom-feed-cdata-partial.xml": {
-                "id": "220ae197-f66f-56b3-a17a-cbfc6dc9661a", # not passed in request
-                "feed_type": "atom", # not passed in request
-                "include_remote_blogs": False
-            },
+
         }
 
 class TestFeedProcessing(BaseTest):
@@ -152,8 +94,6 @@ class TestFeedProcessing(BaseTest):
                     key: value
                     for key, value in {
                         "url": feed_url,
-                        "include_remote_blogs": feed_details.get("include_remote_blogs"),
-                        "profile_id": feed_details.get("profile_id"),
                         "pretty_url": feed_details.get("pretty_url"),
                         "title": feed_details.get("title"),
                         "description": feed_details.get("description"),
