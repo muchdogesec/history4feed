@@ -67,7 +67,7 @@ class FeedPatchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Feed
-        fields = ['title', 'description']
+        fields = ['title', 'description', 'pretty_url']
 
 class FeedFetchSerializer(FeedPatchSerializer):
     profile_id = serializers.UUIDField(required=False, default=None)
