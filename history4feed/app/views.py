@@ -309,7 +309,7 @@ class FeedView(viewsets.ModelViewSet):
             * `url` (required): a valid RSS or ATOM feed URL.  If it is not valid, the Feed will not be created and an error returned. You can use the skeleton endpoint to create a feed from a non RSS/ATOM URL.
             * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to false. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.
             * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
-            * `pretty_url` (optional): you can also inlude a secondary URL in the database. This is designed to be used to show the link to the blog (not the RSS/ATOM) feed so that a user can navigate to the blog in their browser.
+            * `pretty_url` (optional): you can also include a secondary URL in the database. This is designed to be used to show the link to the blog (not the RSS/ATOM) feed so that a user can navigate to the blog in their browser.
             * `title` (optional): the title of the feed will be used if not passed. You can also manually pass the title of the blog here.
             * `description` (optional): the description of the feed will be used if not passed. You can also manually pass the description of the blog here.
 
@@ -364,7 +364,7 @@ class FeedView(viewsets.ModelViewSet):
             The following key/values are accepted in the body of the request:
 
             * `url` (required): the URL to be attached to the feed. Needs to be a URL (because this is what feed ID is generated from), however does not need to be valid.
-            * `pretty_url` (optional): you can also inlude a secondary URL in the database. This is designed to be used to show the link to the blog (not the RSS/ATOM) feed so that a user can navigate to the blog in their browser.
+            * `pretty_url` (optional): you can also include a secondary URL in the database. This is designed to be used to show the link to the blog (not the RSS/ATOM) feed so that a user can navigate to the blog in their browser.
             * `title` (required): the title of the feed
             * `description` (optional): the description of the feed
 
@@ -391,12 +391,19 @@ class FeedView(viewsets.ModelViewSet):
         request=FeedPatchSerializer,
         description=textwrap.dedent(
             """
-            Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.
+            Use this endpoint to update a feed. This includes checking for new posts on this blog since the last update time (for `feed_type` `rss` and `atom` only) and/or updating various properties of the feed (`title`, `description`, `pretty_url`, `profile_id`).
+
+            An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint for `feed_type` `rss` and `atom`.
 
             Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.
 
+            You can also use this endpoint to update the details of the feed. If no values are passed, the properties will not be changed (`title`, `description`, `pretty_url`, `profile_id`).
+
             The following key/values are accepted in the body of the request:
 
+            * `pretty_url` (optional): change the `pretty_url` of the feed
+            * `title` (optional): change the `title` of the feed
+            * `description` (optional): change the `description` of the feed
             * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
 
             The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
