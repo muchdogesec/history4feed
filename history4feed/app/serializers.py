@@ -9,7 +9,7 @@ class TitleField(serializers.CharField):
     def to_representation(self, value):
         value = super().to_representation(value)
         if value.endswith(AUTO_TITLE_TRAIL):
-            value = value[:len(AUTO_TITLE_TRAIL)]
+            value = value[:-len(AUTO_TITLE_TRAIL)]
         return value
 
 class FeedSerializer(serializers.ModelSerializer):
