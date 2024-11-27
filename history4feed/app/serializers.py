@@ -10,6 +10,7 @@ class TitleField(serializers.CharField):
         value = super().to_representation(value)
         if value.endswith(AUTO_TITLE_TRAIL):
             value = value[:len(AUTO_TITLE_TRAIL)]
+        return value
 
 class FeedSerializer(serializers.ModelSerializer):
     count_of_posts = serializers.IntegerField(source='get_post_count', read_only=True, help_text="Number of posts in feed")
