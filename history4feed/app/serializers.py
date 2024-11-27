@@ -69,11 +69,11 @@ class FeedPatchSerializer(serializers.ModelSerializer):
         model = Feed
         fields = ['title', 'description', 'pretty_url']
 
-class FeedFetchSerializer(FeedPatchSerializer):
+class FeedFetchSerializer(FeedPatchSerializer, FeedSerializer):
     profile_id = serializers.UUIDField(required=False, default=None)
     class Meta:
         model = Feed
-        fields = ['profile_id']
+        fields = ['profile_id', 'include_remote_blogs']
 
 class PostCreateSerializer(PostSerializer):
     # feed_id = serializers.UUIDField(source='feed')
