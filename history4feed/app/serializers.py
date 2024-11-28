@@ -14,7 +14,6 @@ class TitleField(serializers.CharField):
 
 class FeedSerializer(serializers.ModelSerializer):
     count_of_posts = serializers.IntegerField(source='get_post_count', read_only=True, help_text="Number of posts in feed")
-    profile_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
     include_remote_blogs = serializers.BooleanField(write_only=True, default=False)
     pretty_url = serializers.URLField(allow_null=True, required=False, help_text="This is a cosmetic URL. It is designed to show the actual blog link to browse to in a web browser (not the feed)")
     title = TitleField(required=False, max_length=256)
@@ -27,12 +26,10 @@ class FeedSerializer(serializers.ModelSerializer):
     def create(self, validated_data: dict):
         validated_data = validated_data.copy()
         validated_data.pop('include_remote_blogs', None)
-        validated_data.pop('profile_id', None)
         return super().create(validated_data)
     
 class SkeletonFeedSerializer(FeedSerializer):
     include_remote_blogs = None
-    profile_id = None
     title = serializers.CharField(required=True, help_text="title of feed")
     description = serializers.CharField(required=True, help_text="description of feed")
     feed_type = serializers.HiddenField(default=FeedType.SKELETON)
@@ -44,7 +41,6 @@ class FeedCreatedJobSerializer(FeedSerializer):
     
 
 class PostSerializer(serializers.ModelSerializer):
-    profile_id = serializers.UUIDField(required=False, default=None)
     # categories = serializers.ManyRelatedField()
     class Meta:
         model = Post
@@ -59,7 +55,7 @@ class PostSerializer(serializers.ModelSerializer):
     
 
 class PatchSerializer(serializers.Serializer):
-    profile_id = serializers.UUIDField(required=False, default=None)
+    pass
 
 class FeedPatchSerializer(serializers.ModelSerializer):
     title = serializers.CharField(required=True, help_text="title of feed")
