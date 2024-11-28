@@ -57,7 +57,7 @@ python3 tests/test_01_add_fakeblog123_atom_rss_feeds.py \
 	--feed-url https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-encoded.xml
 ```
 
-custom title/description
+custom title/description/pretty_url
 
 ```shell
 python3 tests/test_01_add_fakeblog123_atom_rss_feeds.py \

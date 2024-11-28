@@ -302,7 +302,7 @@ class FeedView(viewsets.ModelViewSet):
             The following key/values are accepted in the body of the request:
 
             * `url` (required): a valid RSS or ATOM feed URL.  If it is not valid, the Feed will not be created and an error returned. You can use the skeleton endpoint to create a feed from a non RSS/ATOM URL.
-            * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to false. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.
+            * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to `false`. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.
             * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
             * `pretty_url` (optional): you can also include a secondary URL in the database. This is designed to be used to show the link to the blog (not the RSS/ATOM) feed so that a user can navigate to the blog in their browser.
             * `title` (optional): the title of the feed will be used if not passed. You can also manually pass the title of the blog here.
@@ -427,6 +427,7 @@ class FeedView(viewsets.ModelViewSet):
             The following key/values are accepted in the body of the request:
 
             * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
+             * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to `false`. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.
 
             The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
             """
