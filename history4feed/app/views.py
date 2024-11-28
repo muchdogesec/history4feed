@@ -90,8 +90,6 @@ class ErrorResp(Response):
 
             The following key/values are accepted in the body of the request:
 
-            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
-
             IMPORTANT: This action will delete the original post content making it irretrievable.
 
             The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
@@ -130,8 +128,7 @@ class PostView(
         job_id = Filter(help_text="Filter the Post by Job ID the Post was downloaded in.", field_name="fulltext_jobs__job_id")
 
     def get_queryset(self):
-        subquery = FulltextJob.objects.filter(post_id=OuterRef('pk')).order_by('-job__run_datetime').values('job__profile_id')[:1]
-        return Post.objects.filter(feed_id=self.kwargs.get("feed_id")).annotate(profile_id=Subquery(subquery))
+        return Post.objects.filter(feed_id=self.kwargs.get("feed_id"))
 
     @extend_schema(
         parameters=[FEED_ID_PARAM],
@@ -200,7 +197,7 @@ class PostView(
         s = PatchSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         post: Post = self.get_object()
-        job_obj = task_helper.new_patch_posts_job(post.feed, [post], s.data['profile_id'])
+        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
         job_resp = JobSerializer(job_obj).data.copy()
         job_resp.update(post_id=post.id)
         return Response(job_resp, status=status.HTTP_201_CREATED)
@@ -214,7 +211,6 @@ class PostView(
 
             The following key/values are accepted in the body of the request:
 
-            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
             * `link` (required - must be unique): The URL of the blog post. This is where the content of the post is found. It cannot be the same as the `url` of a post already in this feed. If you want to update the post, use the PATCH post endpoint.
             * `pubdate` (required): The date of the blog post in the format `YYYY-MM-DDTHH:MM:SS.sssZ`. history4feed cannot accurately determine a post date in all cases, so you must enter it manually.
             * `title` (required):  history4feed cannot accurately determine the title of a post in all cases, so you must enter it manually.
@@ -241,7 +237,7 @@ class PostView(
         s2 = PostCreateSerializer(data=data)
         s2.is_valid(raise_exception=True)
         post = s2.save(added_manually=True)
-        job_obj = task_helper.new_patch_posts_job(post.feed, [post], s.data['profile_id'])
+        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
         job_resp = JobSerializer(job_obj).data.copy()
         job_resp.update(post_id=post.id)
         return Response(job_resp, status=status.HTTP_201_CREATED)
@@ -303,7 +299,6 @@ class FeedView(viewsets.ModelViewSet):
 
             * `url` (required): a valid RSS or ATOM feed URL.  If it is not valid, the Feed will not be created and an error returned. You can use the skeleton endpoint to create a feed from a non RSS/ATOM URL.
             * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to `false`. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.
-            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
             * `pretty_url` (optional): you can also include a secondary URL in the database. This is designed to be used to show the link to the blog (not the RSS/ATOM) feed so that a user can navigate to the blog in their browser.
             * `title` (optional): the title of the feed will be used if not passed. You can also manually pass the title of the blog here.
             * `description` (optional): the description of the feed will be used if not passed. You can also manually pass the description of the blog here.
@@ -327,7 +322,6 @@ class FeedView(viewsets.ModelViewSet):
         s = FeedSerializer(data=request.data)
         s.is_valid(raise_exception=True)
 
-        profile_id = request.data.get('profile_id')
         try:
             feed_data = h4f.parse_feed_from_url(s.data["url"])
         except Exception as e:
@@ -339,11 +333,11 @@ class FeedView(viewsets.ModelViewSet):
             elif v := feed_data.get(k):
                 feed_data[k] = v + AUTO_TITLE_TRAIL
         
-        s = FeedSerializer(data={**s.data, **feed_data, 'profile_id': profile_id})
+        s = FeedSerializer(data={**s.data, **feed_data})
         s.is_valid(raise_exception=True)
 
         feed_obj: Feed = s.save(feed_type=feed_data['feed_type'])
-        job_obj = task_helper.new_job(feed_obj, profile_id, s.validated_data.get('include_remote_blogs', False))
+        job_obj = task_helper.new_job(feed_obj, s.validated_data.get('include_remote_blogs', False))
 
         resp_data = self.serializer_class(feed_obj).data.copy()
         resp_data.update(
@@ -426,7 +420,6 @@ class FeedView(viewsets.ModelViewSet):
 
             The following key/values are accepted in the body of the request:
 
-            * `profile_id` (optional): accepts a UUIDv4. You should (generally) not use it. We ([DOGESEC](https://www.dogesec.com)) use this property for integration with Obstracts.
              * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to `false`. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.
 
             The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
@@ -446,7 +439,7 @@ class FeedView(viewsets.ModelViewSet):
         s = FeedFetchSerializer(feed_obj, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
         s.save()
-        job_obj = task_helper.new_job(feed_obj, s.data['profile_id'], s.validated_data.get('include_remote_blogs', False))
+        job_obj = task_helper.new_job(feed_obj, s.validated_data.get('include_remote_blogs', False))
         feed = self.serializer_class(feed_obj).data.copy()
         feed.update(
             job_state=job_obj.state,

@@ -11,22 +11,20 @@ from django.conf import settings
 
 from urllib.parse import urlparse
 
-def new_job(feed: models.Feed, profile_id, include_remote_blogs):
+def new_job(feed: models.Feed, include_remote_blogs):
     job_obj = models.Job.objects.create(
         feed=feed,
         earliest_item_requested=feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE,
         latest_item_requested=datetime.now(),
-        profile_id=profile_id,
         include_remote_blogs=include_remote_blogs,
     )
     (start_job.s(job_obj.pk)| retrieve_posts_from_links.s(job_obj.pk) | wait_for_all_with_retry.s() | collect_and_schedule_removal.si(job_obj.pk)).apply_async(countdown=5)
     return job_obj
 
-def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], profile_id, include_remote_blogs=True):
+def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_remote_blogs=True):
     job_obj = models.Job.objects.create(
         feed=posts[0].feed,
         state=models.JobState.RUNNING,
-        profile_id=profile_id,
         include_remote_blogs=include_remote_blogs,
     )
     ft_jobs = [models.FulltextJob.objects.create(
