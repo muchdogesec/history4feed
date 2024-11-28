@@ -332,15 +332,17 @@ class FeedView(viewsets.ModelViewSet):
             feed_data = h4f.parse_feed_from_url(s.data["url"])
         except Exception as e:
             return ErrorResp(406, "Invalid feed url", details={"error": str(e)})
-        
+
         for k in ['title', 'description']:
             if v := s.validated_data.get(k):
                 feed_data[k] = v
-            else:
-                feed_data[k] = feed_data[k] + AUTO_TITLE_TRAIL
+            elif v := feed_data.get(k):
+                feed_data[k] = v + AUTO_TITLE_TRAIL
+        
+        s = FeedSerializer(data={**s.data, **feed_data, 'profile_id': profile_id})
+        s.is_valid(raise_exception=True)
 
-        s.run_validation({**feed_data, 'profile_id': profile_id})
-        feed_obj: Feed = s.create(validated_data=feed_data)
+        feed_obj: Feed = s.save(feed_type=feed_data['feed_type'])
         job_obj = task_helper.new_job(feed_obj, profile_id, s.validated_data.get('include_remote_blogs', False))
 
         resp_data = self.serializer_class(feed_obj).data.copy()
