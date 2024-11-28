@@ -142,7 +142,6 @@ class TestCrowdStrikeFeedProcessing(unittest.TestCase):
         
         # Step 3: Add the second post to the feed only after the first post job is successful
         post_body_2 = {
-            "profile_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
             "title": "Malicious Inauthentic Falcon Crash Reporter Installer Distributed to German Entity",
             "link": "https://www.crowdstrike.com/en-us/blog/malicious-inauthentic-falcon-crash-reporter-installer-spearphishing/",
             "pubdate": "2024-09-21T00:00:00.000Z"
@@ -174,7 +173,6 @@ class TestCrowdStrikeFeedProcessing(unittest.TestCase):
 
         # Step 4: Add the third post to the feed (should fail due to duplicate link)
         post_body_3 = {
-            "profile_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
             "title": "Malicious Inauthentic Falcon Crash Reporter Installer Distributed to German Entity",
             "link": "https://www.crowdstrike.com/en-us/blog/malicious-inauthentic-falcon-crash-reporter-installer-spearphishing/",
             "pubdate": "2024-09-21T00:00:00.000Z"

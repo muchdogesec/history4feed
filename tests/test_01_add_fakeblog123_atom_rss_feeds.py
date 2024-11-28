@@ -26,11 +26,9 @@ class BaseTest(unittest.TestCase):
                 "description": "Custom description",
                 "include_remote_blogs": False
             },
-            # using profile id
             "https://muchdogesec.github.io/fakeblog123/feeds/atom-feed-cdata.xml": {
                 "id": "121e5557-7277-5aa3-945d-e466c6bf92d5", # not passed in request
                 "feed_type": "atom", # not passed in request
-                "profile_id": "7b6f7c33-563d-4d07-886b-f3e5bfcd81df",
                 "include_remote_blogs": False
             },
             "https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-decoded.xml": {
@@ -153,7 +151,6 @@ class TestFeedProcessing(BaseTest):
                     for key, value in {
                         "url": feed_url,
                         "include_remote_blogs": feed_details.get("include_remote_blogs"),
-                        "profile_id": feed_details.get("profile_id"),
                         "pretty_url": feed_details.get("pretty_url"),
                         "title": feed_details.get("title"),
                         "description": feed_details.get("description"),
