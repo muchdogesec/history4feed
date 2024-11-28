@@ -277,11 +277,11 @@ class FeedView(viewsets.ModelViewSet):
             lookup_expr="icontains",
         )
         id = BaseCSVFilter(
-            help_text="Filter by feed id(s), comma-separated, e.g 6c6e6448-04d4-42a3-9214-4f0f7d02694e,2bce5b30-7014-4a5d-ade7-12913fe6ac36",
+            help_text="Filter by feed id(s), comma-separated, e.g `6c6e6448-04d4-42a3-9214-4f0f7d02694e,2bce5b30-7014-4a5d-ade7-12913fe6ac36`",
             lookup_expr="in",
         )
         feed_type = filters.MultipleChoiceFilter(
-            help_text="Filter by feed_type",
+            help_text="Filter by `feed_type`",
             choices=FeedType.choices,
         )
 
@@ -378,7 +378,7 @@ class FeedView(viewsets.ModelViewSet):
     
     @extend_schema(
         parameters=[FEED_ID_PARAM],
-        summary="Update a Feeds properties",
+        summary="Update a Feeds Metadata",
         request=FeedPatchSerializer,
         description=textwrap.dedent(
             """
@@ -392,7 +392,7 @@ class FeedView(viewsets.ModelViewSet):
             * `description` (optional): update the `description` of the Feed
             * `pretty_url` (optional): update the `pretty_url of the Feed
 
-            The response will contain the newly update Feed object.
+            The response will contain the newly updated Feed object.
             """
         ),
         responses={
