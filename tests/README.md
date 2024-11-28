@@ -64,13 +64,6 @@ python3 tests/test_01_add_fakeblog123_atom_rss_feeds.py \
 	--feed-url https://muchdogesec.github.io/fakeblog123/feeds/atom-feed-decoded.xml
 ```
 
-using profile id
-
-```shell
-python3 tests/test_01_add_fakeblog123_atom_rss_feeds.py \
-	--feed-url https://muchdogesec.github.io/fakeblog123/feeds/atom-feed-cdata.xml
-```
-
 ### Check Skeleton feed
 
 ```shell
