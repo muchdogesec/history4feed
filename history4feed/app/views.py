@@ -128,7 +128,7 @@ class PostView(
         job_id = Filter(help_text="Filter the Post by Job ID the Post was downloaded in.", field_name="fulltext_jobs__job_id")
 
     def get_queryset(self):
-        return Post.objects.filter(feed_id=self.kwargs.get("feed_id"))
+        return Post.visible_posts().filter(feed_id=self.kwargs.get("feed_id"))
 
     @extend_schema(
         parameters=[FEED_ID_PARAM],
@@ -230,17 +230,31 @@ class PostView(
         },
     )
     def create(self, request, *args, feed_id=None, **kwargs):
-        feed_obj = get_object_or_404(Feed.objects, id=feed_id)
+        deleted_obj = None
         data = dict(**request.data, feed_id=feed_id, feed=feed_id)
+
         s = PostSerializer(data=data)
         s.is_valid(raise_exception=True)
-        s2 = PostCreateSerializer(data=data)
+
+        try:
+            deleted_obj = Post.objects.get(feed_id=feed_id, link=s.data['link'])
+        except Exception as e:
+            pass
+
+        s2 = PostCreateSerializer(deleted_obj, data=data)
         s2.is_valid(raise_exception=True)
-        post = s2.save(added_manually=True)
+        post = s2.save(added_manually=True, deleted_manually=False)
         job_obj = task_helper.new_patch_posts_job(post.feed, [post])
         job_resp = JobSerializer(job_obj).data.copy()
         job_resp.update(post_id=post.id)
         return Response(job_resp, status=status.HTTP_201_CREATED)
+    
+    def destroy(self, *args, **kwargs):
+        obj = self.get_object()
+        obj.deleted_manually = True
+        obj.save()
+        obj.feed.save()
+        return Response(None, status=status.HTTP_204_NO_CONTENT)
 
 
 class FeedView(viewsets.ModelViewSet):

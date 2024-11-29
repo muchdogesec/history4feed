@@ -63,7 +63,7 @@ class Feed(models.Model):
     pretty_url = models.URLField(max_length=1000, null=True, default=None)
 
     def get_post_count(self):
-        return self.posts.count()
+        return self.posts.filter(deleted_manually=False).count()
     
     def save(self, *args, **kwargs) -> None:
         if not self.id:
@@ -124,6 +124,7 @@ class Post(models.Model):
     is_full_text = models.BooleanField(default=False, help_text="if full text has been retrieved")
     content_type = models.CharField(default="plain/text", max_length=200, help_text="content type of the description")
     added_manually = models.BooleanField(default=False)
+    deleted_manually = models.BooleanField(default=False, help_text="this post is hidden from user")
 
     class  Meta:
         constraints = [
@@ -140,6 +141,10 @@ class Post(models.Model):
             pubdate = self.pubdate.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             self.id = stix_id(f"{self.feed.id}+{self.link}+{pubdate}")
         return super().save(*args, **kwargs)
+    
+    @classmethod
+    def visible_posts(cls):
+        return cls.objects.filter(deleted_manually=False)
 
 class FulltextJob(models.Model):
     post = models.ForeignKey(Post, on_delete=models.SET_NULL, null=True, related_name="fulltext_jobs")
