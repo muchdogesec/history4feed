@@ -43,7 +43,7 @@ def normalize_url(url):
         u = hyperlink.parse(url)
         return u.normalize(url).to_text()
     except Exception as e:
-        raise validators.ValidationError(f"normalize_url failed for `{url}`: {e}")
+        raise validators.ValidationError(f"URL normalization failed")
     
 AUTO_TITLE_TRAIL = "%^%*(%"
 
