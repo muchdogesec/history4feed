@@ -151,6 +151,7 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
     'DEFAULT_AUTHENTICATION_CLASSES': [],
     'EXCEPTION_HANDLER': "dogesec_commons.utils.custom_exception_handler",
+    'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S%z',
 }
 
 
