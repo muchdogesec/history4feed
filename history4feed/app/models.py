@@ -10,6 +10,7 @@ from django.utils.text import slugify
 import hyperlink
 from django.db.models import Min, Max
 
+
 POST_DESCRIPTION_MAX_LENGTH = 2 * 1024 * 1024 # 2MiB
 FEED_DESCRIPTION_MAX_LENGTH = 10*1024 # 10KiB
 
@@ -74,11 +75,11 @@ class Feed(models.Model):
         return self.pretty_url or self.url
     
     def set_title(self, title):
-        if self.title.endswith(AUTO_TITLE_TRAIL):
+        if not self.title or self.title.endswith(AUTO_TITLE_TRAIL):
             self.title = title + AUTO_TITLE_TRAIL
     
     def set_description(self, description):
-        if self.description.endswith(AUTO_TITLE_TRAIL):
+        if not self.description or self.description.endswith(AUTO_TITLE_TRAIL):
             self.description = description + AUTO_TITLE_TRAIL
 
 class Job(models.Model):
