@@ -8,6 +8,8 @@ from rest_framework import validators
 from uuid import uuid4
 from django.utils.text import slugify
 import hyperlink
+from django.db.models import Min, Max
+
 
 POST_DESCRIPTION_MAX_LENGTH = 2 * 1024 * 1024 # 2MiB
 FEED_DESCRIPTION_MAX_LENGTH = 10*1024 # 10KiB
@@ -41,7 +43,7 @@ def normalize_url(url):
         u = hyperlink.parse(url)
         return u.normalize(url).to_text()
     except Exception as e:
-        raise validators.ValidationError(f"normalize_url failed for `{url}`: {e}")
+        raise validators.ValidationError(f"URL normalization failed")
     
 AUTO_TITLE_TRAIL = "%^%*(%"
 
@@ -66,17 +68,18 @@ class Feed(models.Model):
     def save(self, *args, **kwargs) -> None:
         if not self.id:
             self.id = stix_id(self.url)
+        self.earliest_item_pubdate, self.latest_item_pubdate = self.posts.aggregate(min=Min('pubdate'), max=Max('pubdate')).values()
         return super().save(*args, **kwargs)
     
     def get_pretty_url(self):
         return self.pretty_url or self.url
     
     def set_title(self, title):
-        if self.title.endswith(AUTO_TITLE_TRAIL):
+        if not self.title or self.title.endswith(AUTO_TITLE_TRAIL):
             self.title = title + AUTO_TITLE_TRAIL
     
     def set_description(self, description):
-        if self.description.endswith(AUTO_TITLE_TRAIL):
+        if not self.description or self.description.endswith(AUTO_TITLE_TRAIL):
             self.description = description + AUTO_TITLE_TRAIL
 
 class Job(models.Model):

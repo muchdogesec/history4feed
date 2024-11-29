@@ -16,8 +16,8 @@ class FeedSerializer(serializers.ModelSerializer):
     count_of_posts = serializers.IntegerField(source='get_post_count', read_only=True, help_text="Number of posts in feed")
     include_remote_blogs = serializers.BooleanField(write_only=True, default=False)
     pretty_url = serializers.URLField(allow_null=True, required=False, help_text="This is a cosmetic URL. It is designed to show the actual blog link to browse to in a web browser (not the feed)")
-    title = TitleField(required=False, max_length=256)
-    description = TitleField(required=False, max_length=FEED_DESCRIPTION_MAX_LENGTH)
+    title = TitleField(required=False, max_length=256, allow_null=True, allow_blank=True)
+    description = TitleField(required=False, max_length=FEED_DESCRIPTION_MAX_LENGTH, allow_null=True, allow_blank=True)
     class Meta:
         model = Feed
         fields = '__all__'
@@ -66,10 +66,9 @@ class FeedPatchSerializer(serializers.ModelSerializer):
         fields = ['title', 'description', 'pretty_url']
 
 class FeedFetchSerializer(FeedPatchSerializer, FeedSerializer):
-    profile_id = serializers.UUIDField(required=False, default=None)
     class Meta:
         model = Feed
-        fields = ['profile_id', 'include_remote_blogs']
+        fields = ['include_remote_blogs']
 
 class PostCreateSerializer(PostSerializer):
     # feed_id = serializers.UUIDField(source='feed')
