@@ -8,6 +8,7 @@ from rest_framework import validators
 from uuid import uuid4
 from django.utils.text import slugify
 import hyperlink
+from django.db.models import Min, Max
 
 POST_DESCRIPTION_MAX_LENGTH = 2 * 1024 * 1024 # 2MiB
 FEED_DESCRIPTION_MAX_LENGTH = 10*1024 # 10KiB
@@ -66,6 +67,7 @@ class Feed(models.Model):
     def save(self, *args, **kwargs) -> None:
         if not self.id:
             self.id = stix_id(self.url)
+        self.earliest_item_pubdate, self.latest_item_pubdate = self.posts.aggregate(min=Min('pubdate'), max=Max('pubdate')).values()
         return super().save(*args, **kwargs)
     
     def get_pretty_url(self):

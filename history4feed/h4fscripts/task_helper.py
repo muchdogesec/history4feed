@@ -135,8 +135,6 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
                 post, created = models.Post.objects.get_or_create(defaults=post_dict.__dict__, feed=db_feed, link=post_dict.link)
                 if not created:
                     continue
-                db_feed.earliest_item_pubdate = min(db_feed.earliest_item_pubdate or post.pubdate, post.pubdate)
-                db_feed.latest_item_pubdate   = max(db_feed.latest_item_pubdate   or post.pubdate, post.pubdate)
                 post.save()
                 post.add_categories(categories)
                 all_posts.append(post)
