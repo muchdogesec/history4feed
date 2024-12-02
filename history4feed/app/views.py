@@ -83,6 +83,10 @@ class ErrorResp(Response):
 
 # Create your views here.
 @extend_schema_view(
+    destroy=extend_schema(
+        summary="Delete a Feed by ID",
+        description="This will delete the post inside of the feed. Deleting the post will remove it forever and it will not be reindexed on subsequent feed updates. The only way to re-index it is to add it manually.",
+    ),
     partial_update=extend_schema(
         description=textwrap.dedent(
             """
