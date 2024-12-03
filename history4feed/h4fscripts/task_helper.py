@@ -133,7 +133,7 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
                 categories = post_dict.categories
                 del post_dict.categories
                 post, created = models.Post.objects.get_or_create(defaults=post_dict.__dict__, feed=db_feed, link=post_dict.link)
-                if not created:
+                if not created or post.deleted_manually:
                     continue
                 post.save()
                 post.add_categories(categories)

@@ -44,7 +44,7 @@ class PostSerializer(serializers.ModelSerializer):
     # categories = serializers.ManyRelatedField()
     class Meta:
         model = Post
-        exclude = ['feed']
+        exclude = ['feed', 'deleted_manually']
         read_only_fields = ["id", "datetime_updated", "datetime_added", "description", "is_full_text", "content_type", "added_manually"]
         
     
@@ -78,7 +78,7 @@ class PostCreateSerializer(PostSerializer):
         fields = ["title", "link", "pubdate", "author", "categories", "feed"]
         validators = [
             validators.UniqueTogetherValidator(
-                queryset=Post.objects.all(),
+                queryset=Post.visible_posts(),
                 fields=('feed', 'link'),
                 message='Link already exists in field.',
             )
