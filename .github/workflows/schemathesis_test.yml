@@ -1,9 +1,7 @@
 name: schemathesis tests
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   test-schema-thesis:
