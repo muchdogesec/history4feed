@@ -1,4 +1,4 @@
-name: Auto Create Staging PR
+name: schemathesis tests
 
 on:
   push:
