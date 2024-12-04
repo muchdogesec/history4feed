@@ -1,23 +1,34 @@
-name: Create and publish the Docker image for Obstracts Web Staging
-# description: This workflow builds a Docker image and pushes it to GitHub Container Registry (GHCR) when changes are pushed to the `staging` branch. It uses secrets in the `obstracts_staging` environment and therefore keeps the visibility as private for the image.
+name: Create and publish Docker images for Obstracts Web
+
+description: This workflow builds and pushes Docker images for staging and production environments when changes are pushed to respective branches.
 
 on:
   push:
-    branches: ['staging']
+    branches:
+      - main
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}_obstracts_web_staging
 
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
-    environment: obstracts_web_staging
     permissions:
       contents: read
       packages: write
       attestations: write
       id-token: write
+    strategy:
+      matrix:
+        environment:
+          - name: staging
+            branch: refs/heads/main
+            environment: obstracts_web_staging
+            image_suffix: _web_staging
+          - name: production
+            branch: refs/heads/main
+            environment: obstracts_web_production
+            image_suffix: _web_production
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -31,7 +42,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ github.repository }}${{ matrix.environment.image_suffix }}
       - name: Build and push Docker image
         id: push
         uses: docker/build-push-action@v6
@@ -41,25 +52,25 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # visibility: private
+          visibility: private
           build-args: |
-            EARLIEST_SEARCH_DATE=${{ secrets.EARLIEST_SEARCH_DATE }}
+            EARLIEST_SEARCH_DATE=2018-01-01
+            WAYBACK_SLEEP_SECONDS=45
+            WAYBACK_BACKOFF_TIME=20
+            REQUEST_RETRY_COUNT=3
+            DEFAULT_PAGE_SIZE=50
+            MAX_PAGE_SIZE=50
+            CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP=1
+            POSTGRES_DB='history4feed_database'
+            POSTGRES_HOST='host.docker.internal'
             SCRAPFILE_APIKEY=${{ secrets.SCRAPFILE_APIKEY }}
-            WAYBACK_SLEEP_SECONDS=${{ secrets.WAYBACK_SLEEP_SECONDS }}
-            WAYBACK_BACKOFF_TIME=${{ secrets.WAYBACK_BACKOFF_TIME }}
-            REQUEST_RETRY_COUNT=${{ secrets.REQUEST_RETRY_COUNT }}
-            DEFAULT_PAGE_SIZE=${{ secrets.DEFAULT_PAGE_SIZE }} 
-            MAX_PAGE_SIZE=${{ secrets.MAX_PAGE_SIZE }}
             DJANGO_SECRET=${{ secrets.DJANGO_SECRET }}
             DJANGO_DEBUG=${{ secrets.DJANGO_DEBUG }}
-            CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP=${{ secrets.CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP }}
-            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
             POSTGRES_USER=${{ secrets.POSTGRES_USER }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_HOST=${{ secrets.POSTGRES_HOST }} 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          subject-name: ${{ env.REGISTRY }}/${{ github.repository }}${{ matrix.environment.image_suffix }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
