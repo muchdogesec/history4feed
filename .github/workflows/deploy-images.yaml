@@ -5,7 +5,7 @@ description: This workflow builds and pushes Docker images for staging and produ
 on:
   push:
     branches:
-      - updated-action
+      - main
 
 env:
   REGISTRY: ghcr.io
@@ -64,9 +64,9 @@ jobs:
             MAX_PAGE_SIZE=50
             CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP=1
             POSTGRES_USER=deployer
-            DJANGO_DEBUG=${{ matrix.environment.django_debug }}
             POSTGRES_DB='history4feed_database'
             POSTGRES_HOST='host.docker.internal'
+            DJANGO_DEBUG=${{ matrix.environment.django_debug }}
             SCRAPFILE_APIKEY=${{ secrets.SCRAPFILE_APIKEY }}
             DJANGO_SECRET=${{ secrets.DJANGO_SECRET }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
