@@ -5,7 +5,7 @@ description: This workflow builds and pushes Docker images for staging and produ
 on:
   push:
     branches:
-      - main
+      - updated-action
 
 env:
   REGISTRY: ghcr.io
@@ -25,10 +25,12 @@ jobs:
             branch: refs/heads/main
             environment: obstracts_web_staging
             image_suffix: _web_staging
+            django_debug: true
           - name: production
             branch: refs/heads/main
             environment: obstracts_web_production
             image_suffix: _web_production
+            django_debug: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -61,12 +63,12 @@ jobs:
             DEFAULT_PAGE_SIZE=50
             MAX_PAGE_SIZE=50
             CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP=1
+            POSTGRES_USER=deployer
+            DJANGO_DEBUG=${{ matrix.environment.django_debug }}
             POSTGRES_DB='history4feed_database'
             POSTGRES_HOST='host.docker.internal'
             SCRAPFILE_APIKEY=${{ secrets.SCRAPFILE_APIKEY }}
             DJANGO_SECRET=${{ secrets.DJANGO_SECRET }}
-            DJANGO_DEBUG=${{ secrets.DJANGO_DEBUG }}
-            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
