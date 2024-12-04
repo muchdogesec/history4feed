@@ -25,10 +25,12 @@ jobs:
             branch: refs/heads/main
             environment: obstracts_web_staging
             image_suffix: _web_staging
+            django_debug: true
           - name: production
             branch: refs/heads/main
             environment: obstracts_web_production
             image_suffix: _web_production
+            django_debug: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -54,7 +56,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           visibility: private
           build-args: |
-            DJANGO_DEBUG=${{ secrets.DJANGO_DEBUG }}
+            DJANGO_DEBUG=${{ matrix.environment.django_debug }}
             SCRAPFILE_APIKEY=${{ secrets.SCRAPFILE_APIKEY }}
             DJANGO_SECRET=${{ secrets.DJANGO_SECRET }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
