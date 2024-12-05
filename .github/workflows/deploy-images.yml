@@ -25,12 +25,12 @@ jobs:
             branch: refs/heads/main
             environment: obstracts_web_staging
             image_suffix: _web_staging
-            django_debug: true
+            django_debug: True
           - name: production
             branch: refs/heads/main
             environment: obstracts_web_production
             image_suffix: _web_production
-            django_debug: false
+            django_debug: False
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

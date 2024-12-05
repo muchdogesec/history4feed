@@ -20,7 +20,7 @@ from .utils import (
 from dogesec_commons.utils.serializers import CommonErrorSerializer
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
+from .serializers import FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, PostWithFeedIDSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
 from .models import AUTO_TITLE_TRAIL, FulltextJob, Post, Feed, Job, FeedType
 from rest_framework import (
     viewsets,
@@ -82,37 +82,40 @@ class ErrorResp(Response):
 
 
 # Create your views here.
+
 @extend_schema_view(
-    destroy=extend_schema(
-        summary="Delete a Feed by ID",
-        description="This will delete the post inside of the feed. Deleting the post will remove it forever and it will not be reindexed on subsequent feed updates. The only way to re-index it is to add it manually.",
-    ),
-    partial_update=extend_schema(
+    retrieve=extend_schema(
+        summary="Get a Post",
         description=textwrap.dedent(
             """
-            Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.
-
-            The following key/values are accepted in the body of the request:
-
-            IMPORTANT: This action will delete the original post content making it irretrievable.
-
-            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+            This will return a single Post by its ID. It is useful if you only want to get the data for a single entry.
             """
         ),
-        summary="Update a Post in a Feed",
         responses={
-            201: PostJobSerializer,
-            404: OpenApiResponse(CommonErrorSerializer, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
+            200: PostWithFeedIDSerializer,
+            404: OpenApiResponse(CommonErrorSerializer, "Post not found", examples=[HTTP404_EXAMPLE]),
+            400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
-        request=PatchSerializer,
     ),
-)
-class PostView(
-    mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
-):
+    list=extend_schema(
+        summary="Search for Posts",
+        description=textwrap.dedent(
+            """
+            Returns all Posts indexed. Filter by the ones you're interested in.
+            """
+        ),
+        responses={
+            200: PostWithFeedIDSerializer,
+            404: OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
+            400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
+        },
+    )
 
-    openapi_tags = ["Feeds"]
-    serializer_class = PostSerializer
+)
+class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
+    openapi_path_params = [POST_ID_PARAM]
+    openapi_tags = ["Posts"]
+    serializer_class = PostWithFeedIDSerializer
     lookup_url_kwarg = "post_id"
     pagination_class = Pagination("posts")
     filter_backends = [DjangoFilterBackend, Ordering, MinMaxDateFilter]
@@ -121,144 +124,23 @@ class PostView(
     minmax_date_fields = ["pubdate"]
 
     class filterset_class(FilterSet):
+        feed_id = filters.BaseInFilter(help_text="filter by one or more `feed_id`(s)")
         title = Filter(
-            help_text="Filter by the content in a posts title. Will search for titles that contain the value entered.",
-            lookup_expr="search",
+            help_text="Filter the content by the `title` of the post. Will search for titles that contain the value entered. Search is wildcard so `exploit` will match `exploited` and `exploits`.",
+            lookup_expr="icontains",
         )
         description = Filter(
-            help_text="Filter by the content in a posts description. Will search for descriptions that contain the value entered.",
-            lookup_expr="search",
+            help_text="Filter by the content post `description`. Will search for descriptions that contain the value entered. Search is wildcard so `exploit` will match `exploited` and `exploits`.",
+            lookup_expr="icontains",
+        )
+        link = Filter(
+            help_text="Filter the content by a posts `link`. Will search for links that contain the value entered. Search is wildcard so `dogesec` will return any URL that contains the string `dogesec`.",
+            lookup_expr="icontains",
         )
         job_id = Filter(help_text="Filter the Post by Job ID the Post was downloaded in.", field_name="fulltext_jobs__job_id")
 
     def get_queryset(self):
-        return Post.visible_posts().filter(feed_id=self.kwargs.get("feed_id"))
-
-    @extend_schema(
-        parameters=[FEED_ID_PARAM],
-        filters=True,
-        summary="Search for Posts in a Feed (RSS)",
-        description=textwrap.dedent(
-            """
-            Use this endpoint with your feed reader. The response of this endpoint is valid RSS XML for the Posts in the Feed. If you want more flexibility (perhaps to build a custom integration) use the JSON version of this endpoint.
-            """
-        ),
-        responses={
-            (200, RSSRenderer.media_type): XML_RESPONSE,
-            (404, "application/json"): OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
-            (400, "application/json"): OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
-        },
-    )
-    @decorators.action(
-        methods=["get"],
-        detail=False,
-        pagination_class=XMLPostPagination("xml_posts"),
-        renderer_classes=[RSSRenderer, renderers.JSONRenderer],
-    )
-    def xml(self, request: request.Request, *args, feed_id=None, **kwargs):
-        feed_obj = get_object_or_404(Feed, id=feed_id)
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        body = build_rss.build_rss(feed_obj, page)
-        return self.paginator.get_paginated_response(body)
-
-    @extend_schema(
-        parameters=[FEED_ID_PARAM],
-        summary="Search for Posts in a Feed (JSON)",
-        description=textwrap.dedent(
-            """
-            Use this endpoint if you want to search through all Posts in a Feed. The response of this endpoint is JSON, and is useful if you're building a custom integration to a downstream tool. If you just want to import the data for this blog into your feed reader use the RSS version of this endpoint.
-            """
-        ),
-        responses={
-            200: PostSerializer,
-            404: OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
-            400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
-        },
-    )
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
-    @extend_schema(
-        parameters=[FEED_ID_PARAM, POST_ID_PARAM],
-        summary="Get a Post in a Feed",
-        description=textwrap.dedent(
-            """
-            This will return a single Post in a Feed using its ID. It is useful if you only want to get the data for a single entry.
-            """
-        ),
-        responses={
-            200: PostSerializer,
-            404: OpenApiResponse(CommonErrorSerializer, "Feed or post not found", examples=[HTTP404_EXAMPLE]),
-            400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
-        },
-    )
-    def retrieve(self, request, *args, **kwargs):
-        return super().retrieve(request, *args, **kwargs)
-    
-
-    def partial_update(self, request, *args, **kwargs):
-        s = PatchSerializer(data=request.data)
-        s.is_valid(raise_exception=True)
-        post: Post = self.get_object()
-        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
-        job_resp = JobSerializer(job_obj).data.copy()
-        job_resp.update(post_id=post.id)
-        return Response(job_resp, status=status.HTTP_201_CREATED)
-    
-    @extend_schema(
-        parameters=[FEED_ID_PARAM],
-        summary="Add a Post manually to a Feed",
-        description=textwrap.dedent(
-            """
-            This endpoint allows you to add Posts manually to a Feed. This endpoint is designed to ingest posts that are not identified by the Wayback Machine (used by the POST Feed endpoint during ingestion). If the feed you want to add a post to does not already exist, you should first add it using the POST Feed endpoint.
-
-            The following key/values are accepted in the body of the request:
-
-            * `link` (required - must be unique): The URL of the blog post. This is where the content of the post is found. It cannot be the same as the `url` of a post already in this feed. If you want to update the post, use the PATCH post endpoint.
-            * `pubdate` (required): The date of the blog post in the format `YYYY-MM-DDTHH:MM:SS.sssZ`. history4feed cannot accurately determine a post date in all cases, so you must enter it manually.
-            * `title` (required):  history4feed cannot accurately determine the title of a post in all cases, so you must enter it manually.
-            * `author` (optional): the value to be stored for the author of the post.
-            * `categories` (optional) : the value(s) to be stored for the category of the post. Pass as a list like `["tag1","tag2"]`.
-
-            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
-
-            Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).
-
-            _Note: We do have a proof-of-concept to scrape a site for all blog post urls, titles, and pubdate called [sitemap2posts](https://github.com/muchdogesec/sitemap2posts) which can help form the request body needed for this endpoint._
-            """
-        ),
-        responses={
-            201: PostJobSerializer,
-            404: OpenApiResponse(CommonErrorSerializer, "Feed does not exist", examples=[HTTP404_EXAMPLE]),
-        },
-    )
-    def create(self, request, *args, feed_id=None, **kwargs):
-        deleted_obj = None
-        data = dict(**request.data, feed_id=feed_id, feed=feed_id)
-
-        s = PostSerializer(data=data)
-        s.is_valid(raise_exception=True)
-
-        try:
-            deleted_obj = Post.objects.get(feed_id=feed_id, link=s.data['link'])
-        except Exception as e:
-            pass
-
-        s2 = PostCreateSerializer(deleted_obj, data=data)
-        s2.is_valid(raise_exception=True)
-        post = s2.save(added_manually=True, deleted_manually=False)
-        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
-        job_resp = JobSerializer(job_obj).data.copy()
-        job_resp.update(post_id=post.id)
-        return Response(job_resp, status=status.HTTP_201_CREATED)
-    
-    def destroy(self, *args, **kwargs):
-        obj = self.get_object()
-        obj.deleted_manually = True
-        obj.save()
-        obj.feed.save()
-        return Response(None, status=status.HTTP_204_NO_CONTENT)
+        return Post.visible_posts()
 
 
 class FeedView(viewsets.ModelViewSet):
@@ -284,11 +166,11 @@ class FeedView(viewsets.ModelViewSet):
     class filterset_class(FilterSet):
         title = Filter(
             help_text="Filter by the content in feed title. Will search for titles that contain the value entered.",
-            lookup_expr="search",
+            lookup_expr="icontains",
         )
         description = Filter(
             help_text="Filter by the content in feed description. Will search for descriptions that contain the value entered.",
-            lookup_expr="search",
+            lookup_expr="icontains",
         )
         url = Filter(
             help_text="Filter by the content in a feeds URL. Will search for URLs that contain the value entered.",
@@ -515,6 +397,167 @@ class FeedView(viewsets.ModelViewSet):
     )
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
+
+
+
+@extend_schema_view(
+    destroy=extend_schema(
+        summary="Delete a Feed by ID",
+        description="This will delete the post inside of the feed. Deleting the post will remove it forever and it will not be reindexed on subsequent feed updates. The only way to re-index it is to add it manually.",
+    ),
+    retrieve=extend_schema(
+        parameters=[FEED_ID_PARAM, POST_ID_PARAM],
+        summary="Get a Post in a Feed",
+        description=textwrap.dedent(
+            """
+            This will return a single Post in a Feed using its ID. It is useful if you only want to get the data for a single entry.
+            """
+        ),
+        responses={
+            200: PostSerializer,
+            404: OpenApiResponse(CommonErrorSerializer, "Feed or post not found", examples=[HTTP404_EXAMPLE]),
+            400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
+        },
+    ),
+    list=extend_schema(
+        summary="Search for Posts in a Feed (JSON)",
+        description=textwrap.dedent(
+            """
+            Use this endpoint if you want to search through all Posts in a Feed. The response of this endpoint is JSON, and is useful if you're building a custom integration to a downstream tool. If you just want to import the data for this blog into your feed reader use the RSS version of this endpoint.
+            """
+        ),
+        responses={
+            200: PostSerializer,
+            404: OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
+            400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
+        },
+    ),
+    partial_update=extend_schema(
+        description=textwrap.dedent(
+            """
+            Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.
+
+            The following key/values are accepted in the body of the request:
+
+            IMPORTANT: This action will delete the original post content making it irretrievable.
+
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+            """
+        ),
+        summary="Update a Post in a Feed",
+        responses={
+            201: PostJobSerializer,
+            404: OpenApiResponse(CommonErrorSerializer, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
+        },
+        request=PatchSerializer,
+    ),
+)
+
+class FeedPostView(
+    PostOnlyView
+):
+
+    openapi_tags = ["Feeds"]
+    serializer_class = PostSerializer
+
+    class filterset_class(PostOnlyView.filterset_class):
+        feed_id = None
+
+    def get_queryset(self):
+        return Post.visible_posts().filter(feed_id=self.kwargs.get("feed_id"))
+
+    @extend_schema(
+        parameters=[FEED_ID_PARAM],
+        filters=True,
+        summary="Search for Posts in a Feed (RSS)",
+        description=textwrap.dedent(
+            """
+            Use this endpoint with your feed reader. The response of this endpoint is valid RSS XML for the Posts in the Feed. If you want more flexibility (perhaps to build a custom integration) use the JSON version of this endpoint.
+            """
+        ),
+        responses={
+            (200, RSSRenderer.media_type): XML_RESPONSE,
+            (404, "application/json"): OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
+            (400, "application/json"): OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
+        },
+    )
+    @decorators.action(
+        methods=["get"],
+        detail=False,
+        pagination_class=XMLPostPagination("xml_posts"),
+        renderer_classes=[RSSRenderer, renderers.JSONRenderer],
+    )
+    def xml(self, request: request.Request, *args, feed_id=None, **kwargs):
+        feed_obj = get_object_or_404(Feed, id=feed_id)
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        body = build_rss.build_rss(feed_obj, page)
+        return self.paginator.get_paginated_response(body)
+    
+
+    def partial_update(self, request, *args, **kwargs):
+        s = PatchSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        post: Post = self.get_object()
+        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
+        job_resp = JobSerializer(job_obj).data.copy()
+        job_resp.update(post_id=post.id)
+        return Response(job_resp, status=status.HTTP_201_CREATED)
+    
+    @extend_schema(
+        parameters=[FEED_ID_PARAM],
+        summary="Add a Post manually to a Feed",
+        description=textwrap.dedent(
+            """
+            This endpoint allows you to add Posts manually to a Feed. This endpoint is designed to ingest posts that are not identified by the Wayback Machine (used by the POST Feed endpoint during ingestion). If the feed you want to add a post to does not already exist, you should first add it using the POST Feed endpoint.
+
+            The following key/values are accepted in the body of the request:
+
+            * `link` (required - must be unique): The URL of the blog post. This is where the content of the post is found. It cannot be the same as the `url` of a post already in this feed. If you want to update the post, use the PATCH post endpoint.
+            * `pubdate` (required): The date of the blog post in the format `YYYY-MM-DDTHH:MM:SS.sssZ`. history4feed cannot accurately determine a post date in all cases, so you must enter it manually.
+            * `title` (required):  history4feed cannot accurately determine the title of a post in all cases, so you must enter it manually.
+            * `author` (optional): the value to be stored for the author of the post.
+            * `categories` (optional) : the value(s) to be stored for the category of the post. Pass as a list like `["tag1","tag2"]`.
+
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+
+            Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).
+
+            _Note: We do have a proof-of-concept to scrape a site for all blog post urls, titles, and pubdate called [sitemap2posts](https://github.com/muchdogesec/sitemap2posts) which can help form the request body needed for this endpoint._
+            """
+        ),
+        responses={
+            201: PostJobSerializer,
+            404: OpenApiResponse(CommonErrorSerializer, "Feed does not exist", examples=[HTTP404_EXAMPLE]),
+        },
+    )
+    def create(self, request, *args, feed_id=None, **kwargs):
+        deleted_obj = None
+        data = dict(**request.data, feed_id=feed_id, feed=feed_id)
+
+        s = PostSerializer(data=data)
+        s.is_valid(raise_exception=True)
+
+        try:
+            deleted_obj = Post.objects.get(feed_id=feed_id, link=s.data['link'])
+        except Exception as e:
+            pass
+
+        s2 = PostCreateSerializer(deleted_obj, data=data)
+        s2.is_valid(raise_exception=True)
+        post = s2.save(added_manually=True, deleted_manually=False)
+        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
+        job_resp = JobSerializer(job_obj).data.copy()
+        job_resp.update(post_id=post.id)
+        return Response(job_resp, status=status.HTTP_201_CREATED)
+    
+    def destroy(self, *args, **kwargs):
+        obj = self.get_object()
+        obj.deleted_manually = True
+        obj.save()
+        obj.feed.save()
+        return Response(None, status=status.HTTP_204_NO_CONTENT)
+
 
 
 class JobView(

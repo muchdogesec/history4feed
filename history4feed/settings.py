@@ -151,9 +151,8 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
     'DEFAULT_AUTHENTICATION_CLASSES': [],
     'EXCEPTION_HANDLER': "dogesec_commons.utils.custom_exception_handler",
-    'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S%z',
+    'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%SZ',
 }
-
 
 SPECTACULAR_SETTINGS = {
     'TITLE': "history4feed API",
@@ -169,6 +168,10 @@ SPECTACULAR_SETTINGS = {
         {
             "name": "Feeds",
             "description": "Subscribe and retrieve blogs and blog posts"
+        },
+        {
+            "name": "Posts",
+            "description": "retrieve posts"
         },
         {
             "name": "Jobs",

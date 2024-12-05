@@ -53,6 +53,9 @@ class PostSerializer(serializers.ModelSerializer):
             data['categories'] = [Category.objects.get_or_create(name=name)[0].name for name in categories]
         return super().run_validation(data)
     
+class PostWithFeedIDSerializer(PostSerializer):
+    feed_id = serializers.UUIDField()
+    
 
 class PatchSerializer(serializers.Serializer):
     pass
