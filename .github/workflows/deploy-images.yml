@@ -26,13 +26,13 @@ jobs:
             environment: obstracts_web_staging
             image_suffix: _web_staging
             django_debug: True
-            scrapfly_api_key: SCRAPFILE_APIKEY
+            scrapfly_api_key: ${{ secrets.SCRAPFILE_APIKEY }}
           - name: production
             branch: refs/heads/main
             environment: obstracts_web_production
             image_suffix: _web_production
             django_debug: False
-            scrapfly_api_key: SCRAPFILE_APIKEY
+            scrapfly_api_key: ${{ secrets.SCRAPFILE_APIKEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
