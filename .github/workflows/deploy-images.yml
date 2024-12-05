@@ -5,7 +5,7 @@ description: This workflow builds and pushes Docker images for staging and produ
 on:
   push:
     branches:
-      - main
+      - testing-secrets-issue
 
 env:
   REGISTRY: ghcr.io
@@ -22,12 +22,12 @@ jobs:
       matrix:
         environment:
           - name: staging
-            branch: refs/heads/main
+            branch: main
             environment: obstracts_web_staging
             image_suffix: _web_staging
             django_debug: True
           - name: production
-            branch: refs/heads/main
+            branch: main
             environment: obstracts_web_production
             image_suffix: _web_production
             django_debug: False
