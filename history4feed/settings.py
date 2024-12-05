@@ -171,6 +171,10 @@ SPECTACULAR_SETTINGS = {
             "description": "Subscribe and retrieve blogs and blog posts"
         },
         {
+            "name": "Posts",
+            "description": "retrieve posts"
+        },
+        {
             "name": "Jobs",
             "description": "Check the status of data retrieval from blogs"
         },
