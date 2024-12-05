@@ -1,4 +1,5 @@
 name: Create and publish the Docker image for Obstracts Web Staging
+
 on:
   push:
     branches: ['main']

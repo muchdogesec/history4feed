@@ -2,7 +2,7 @@ name: Create and publish the Docker image for Obstracts Web Production
 
 on:
   push:
-    branches: ['testing-secrets-issue']
+    branches: ['main']
 
 env:
   REGISTRY: ghcr.io
