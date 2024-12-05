@@ -1,36 +1,22 @@
-name: Create and publish Docker images for Obstracts Web
-
-description: This workflow builds and pushes Docker images for staging and production environments when changes are pushed to respective branches.
+name: Create and publish the Docker image for Obstracts Web Staging
 
 on:
   push:
-    branches:
-      - main
+    branches: ['main']
 
 env:
   REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}_web_staging
 
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
+    environment: obstracts_web_staging
     permissions:
       contents: read
       packages: write
       attestations: write
-      id-token: write
-    strategy:
-      matrix:
-        environment:
-          - name: staging
-            branch: refs/heads/main
-            environment: obstracts_web_staging
-            image_suffix: _web_staging
-            django_debug: True
-          - name: production
-            branch: refs/heads/main
-            environment: obstracts_web_production
-            image_suffix: _web_production
-            django_debug: False
+      id-token: write 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -44,7 +30,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}${{ matrix.environment.image_suffix }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Build and push Docker image
         id: push
         uses: docker/build-push-action@v6
@@ -54,15 +40,14 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          visibility: private
           build-args: |
-            DJANGO_DEBUG=${{ matrix.environment.django_debug }}
+            DJANGO_DEBUG=False
             SCRAPFILE_APIKEY=${{ secrets.SCRAPFILE_APIKEY }}
             DJANGO_SECRET=${{ secrets.DJANGO_SECRET }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ github.repository }}${{ matrix.environment.image_suffix }}
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
