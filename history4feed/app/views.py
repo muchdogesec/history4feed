@@ -92,7 +92,7 @@ class ErrorResp(Response):
             """
         ),
         responses={
-            200: PostSerializer,
+            200: PostWithFeedIDSerializer,
             404: OpenApiResponse(CommonErrorSerializer, "Post not found", examples=[HTTP404_EXAMPLE]),
             400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
@@ -105,7 +105,7 @@ class ErrorResp(Response):
             """
         ),
         responses={
-            200: PostSerializer,
+            200: PostWithFeedIDSerializer,
             404: OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
             400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
