@@ -101,7 +101,7 @@ class ErrorResp(Response):
         summary="Search for Posts",
         description=textwrap.dedent(
             """
-            Returns all Posts indexed. Filter by the ones you're interested in.
+            Search through Posts from all Blogs. Filter by the ones you're interested in.
             """
         ),
         responses={
