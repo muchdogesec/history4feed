@@ -171,7 +171,7 @@ SPECTACULAR_SETTINGS = {
         },
         {
             "name": "Posts",
-            "description": "retrieve posts"
+            "description": "Retrieve Posts from all blogs"
         },
         {
             "name": "Jobs",
