@@ -33,6 +33,18 @@ DEBUG = os.getenv('DJANGO_DEBUG', False)
 
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', "localhost 127.0.0.1 [::1]").split()
 
+CELERY_BROKER_URL = os.environ["CELERY_BROKER_URL"]
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': CELERY_BROKER_URL,  # Use the appropriate Redis server URL
+        'OPTIONS': {
+            # 'CLIENT_CLASS': 'django.core.cache.backends.redis.RedisCacheClient',
+        }
+    }
+}
+
 #CORS_ALLOW_ALL_ORIGINS = os.environ.get('DJANGO_CORS_ALLOW_ALL_ORIGINS', True)
 #CORS_ALLOWED_ORIGINS = [os.environ.get('DJANGO_CORS_ALLOWED_ORIGINS', "http://127.0.0.1:8002")]
 

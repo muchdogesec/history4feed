@@ -1,7 +1,8 @@
 import time
-from celery import shared_task
+from celery import shared_task, Task as CeleryTask
 import celery
 from celery.result import ResultSet, AsyncResult
+import redis
 
 from ..app import models
 from django.conf import settings
@@ -10,21 +11,46 @@ from datetime import datetime
 from django.conf import settings
 
 from urllib.parse import urlparse
+from contextlib import contextmanager
+from django.core.cache import cache
+from rest_framework.exceptions import APIException, Throttled
+from django.db import transaction
+
+LOCK_EXPIRE = 60 * 60
+
+def get_lock_id(feed: models.Feed):
+    lock_id = f"feed-lock-{feed.id}"
+    logger.debug("using lock id %s", lock_id)
+    return lock_id
+
+def queue_lock(feed: models.Feed, job=None):
+    lock_value = dict(feed_id=str(feed.id))
+    if job:
+        lock_value["job_id"] = str(job.id)
+        
+    status = cache.add(get_lock_id(feed), lock_value, timeout=LOCK_EXPIRE)
+    return status
+
+
 
 def new_job(feed: models.Feed, include_remote_blogs):
-    job_obj = models.Job.objects.create(
-        feed=feed,
-        earliest_item_requested=feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE,
-        latest_item_requested=datetime.now(),
-        include_remote_blogs=include_remote_blogs,
-    )
-    (start_job.s(job_obj.pk)| retrieve_posts_from_links.s(job_obj.pk) | wait_for_all_with_retry.s() | collect_and_schedule_removal.si(job_obj.pk)).apply_async(countdown=5)
-    return job_obj
+    with transaction.atomic():
+        job_obj = models.Job.objects.create(
+            feed=feed,
+            earliest_item_requested=feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE,
+            latest_item_requested=datetime.now(),
+            include_remote_blogs=include_remote_blogs,
+        )
+        if not queue_lock(feed, job_obj):
+            raise Throttled(detail={"message": "A job is already running for this feed", **cache.get(get_lock_id(feed))})
+
+        (start_job.s(job_obj.pk)| retrieve_posts_from_links.s(job_obj.pk) | wait_for_all_with_retry.s() | collect_and_schedule_removal.si(job_obj.pk)).apply_async(countdown=5)
+        return job_obj
 
 def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_remote_blogs=True):
     job_obj = models.Job.objects.create(
         feed=posts[0].feed,
-        state=models.JobState.RUNNING,
+        state=models.JobState.PENDING,
         include_remote_blogs=include_remote_blogs,
     )
     ft_jobs = [models.FulltextJob.objects.create(
@@ -33,8 +59,17 @@ def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_rem
         link=post.link,
     ) for post in posts]
     chain = celery.chain([retrieve_full_text.si(ft_job.pk) for ft_job in ft_jobs])
-    ( chain | collect_and_schedule_removal.si(job_obj.pk)).apply_async()
+    ( start_post_job.si(job_obj.id) | chain | collect_and_schedule_removal.si(job_obj.pk)).apply_async()
     return job_obj
+
+@shared_task(bind=True, default_retry_delay=10)
+def start_post_job(self: CeleryTask, job_id):
+    job = models.Job.objects.get(pk=job_id)
+    if not queue_lock(job.feed, job):
+        return self.retry(max_retries=360)
+    job.state = models.JobState.RUNNING
+    job.save()
+    return True
 
 @shared_task
 def start_job(job_id):
@@ -91,7 +126,7 @@ def retrieve_posts_from_links(urls, job_id):
     feed.set_title(parsed_feed['title'])
     
     feed.save()
-    logger.info("====\n"*20)
+    logger.info("====\n"*5)
     return [result.id for result in chains]
 
 
@@ -99,6 +134,10 @@ def retrieve_posts_from_links(urls, job_id):
 def collect_and_schedule_removal(sender, job_id):
     logger.print(f"===> {sender=}, {job_id=} ")
     job = models.Job.objects.get(pk=job_id)
+    if cache.delete(get_lock_id(job.feed)):
+        logger.debug("lock deleted")
+    else:
+        logger.debug("Failed to remove lock")
     if job.state == models.JobState.RUNNING:
         job.state = models.JobState.SUCCESS
         job.save()
@@ -169,7 +208,7 @@ def retrieve_full_text(self, ftjob_pk):
 
 
 
-def is_remote_post(url1, url2):
-    uri1 = urlparse(url1)
-    uri2 = urlparse(url2)
-    return uri1.hostname != uri2.hostname
+from celery import signals
+@signals.worker_ready.connect
+def mark_old_jobs_as_failed(**kwargs):
+    models.Job.objects.filter(state=models.JobState.PENDING).update(state=models.JobState.FAILED, info="marked as failed on startup")
