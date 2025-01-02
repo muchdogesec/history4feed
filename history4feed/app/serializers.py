@@ -40,9 +40,49 @@ class FeedCreatedJobSerializer(FeedSerializer):
     job_state = serializers.CharField(read_only=True, help_text="only returns with POST /feeds/")
     
 
+
+
+class PostListSerializer(serializers.ListSerializer):
+    child = None
+
+    @property
+    def feed_id(self):
+        return self.context.get('feed_id')
+    
+
+    def run_child_validation(self, data):
+        """
+        Run validation on child serializer.
+        You may need to override this method to support multiple updates. For example:
+
+        self.child.instance = self.instance.get(pk=data['id'])
+        self.child.initial_data = data
+        return super().run_child_validation(data)
+        """
+        data.setdefault('feed', self.feed_id)
+        return self.child.run_validation(data)
+    
+    def create(self, validated_data: list[dict]):
+        instances = []
+        for attrs in validated_data:
+            feed_id = attrs.setdefault('feed_id', self.feed_id)
+            instance = None
+            try:
+                instance = Post.objects.get(feed_id=feed_id, link=attrs['link'])
+            except:
+                pass
+            if instance:
+                instance = self.child.update(instance, attrs)
+            else:
+                instance = self.child.create(attrs)
+
+            instances.append(instance)
+        return instances
+
 class PostSerializer(serializers.ModelSerializer):
     # categories = serializers.ManyRelatedField()
     class Meta:
+        list_serializer_class = PostListSerializer
         model = Post
         exclude = ['feed', 'deleted_manually']
         read_only_fields = ["id", "datetime_updated", "datetime_added", "description", "is_full_text", "content_type", "added_manually"]
@@ -55,6 +95,7 @@ class PostSerializer(serializers.ModelSerializer):
     
 class PostWithFeedIDSerializer(PostSerializer):
     feed_id = serializers.UUIDField()
+    
     
 
 class PatchSerializer(serializers.Serializer):
@@ -77,13 +118,14 @@ class PostCreateSerializer(PostSerializer):
     # feed_id = serializers.UUIDField(source='feed')
     link = serializers.URLField(validators=[normalize_url])
     class Meta:
+        list_serializer_class = PostListSerializer
         model = Post
         fields = ["title", "link", "pubdate", "author", "categories", "feed"]
         validators = [
             validators.UniqueTogetherValidator(
                 queryset=Post.visible_posts(),
                 fields=('feed', 'link'),
-                message='Link already exists in field.',
+                message='Post with link already exists in feed.',
             )
         ]
 

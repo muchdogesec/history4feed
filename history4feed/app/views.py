@@ -20,7 +20,7 @@ from .utils import (
 from dogesec_commons.utils.serializers import CommonErrorSerializer
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, PostWithFeedIDSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
+from .serializers import FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, PostListSerializer, PostWithFeedIDSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
 from .models import AUTO_TITLE_TRAIL, FulltextJob, Post, Feed, Job, FeedType
 from rest_framework import (
     viewsets,
@@ -530,25 +530,20 @@ class FeedPostView(
             201: PostJobSerializer,
             404: OpenApiResponse(CommonErrorSerializer, "Feed does not exist", examples=[HTTP404_EXAMPLE]),
         },
+        request=PostSerializer(many=True),
     )
     def create(self, request, *args, feed_id=None, **kwargs):
         deleted_obj = None
-        data = dict(**request.data, feed_id=feed_id, feed=feed_id)
+        data = list(request.data) #, feed_id=feed_id, feed=feed_id)
 
-        s = PostSerializer(data=data)
+        s = PostCreateSerializer(data=data, context=dict(feed_id=feed_id), many=True, allow_empty=False)
         s.is_valid(raise_exception=True)
 
-        try:
-            deleted_obj = Post.objects.get(feed_id=feed_id, link=s.data['link'])
-        except Exception as e:
-            pass
+        posts = s.save(added_manually=True, deleted_manually=False)
 
-        s2 = PostCreateSerializer(deleted_obj, data=data)
-        s2.is_valid(raise_exception=True)
-        post = s2.save(added_manually=True, deleted_manually=False)
-        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
+        job_obj = task_helper.new_patch_posts_job(posts[0].feed, posts)
         job_resp = JobSerializer(job_obj).data.copy()
-        job_resp.update(post_id=post.id)
+        # job_resp.update(post_id=post.id)
         return Response(job_resp, status=status.HTTP_201_CREATED)
     
     def destroy(self, *args, **kwargs):
