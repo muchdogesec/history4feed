@@ -20,7 +20,7 @@ from .utils import (
 from dogesec_commons.utils.serializers import CommonErrorSerializer
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, PostListSerializer, PostWithFeedIDSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
+from .serializers import CreatePostsSerializer, FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, PostListSerializer, PostWithFeedIDSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
 from .models import AUTO_TITLE_TRAIL, FulltextJob, Post, Feed, Job, FeedType
 from rest_framework import (
     viewsets,
@@ -530,13 +530,14 @@ class FeedPostView(
             201: PostJobSerializer,
             404: OpenApiResponse(CommonErrorSerializer, "Feed does not exist", examples=[HTTP404_EXAMPLE]),
         },
-        request=PostSerializer(many=True),
+        request=CreatePostsSerializer,
     )
     def create(self, request, *args, feed_id=None, **kwargs):
         deleted_obj = None
-        data = list(request.data) #, feed_id=feed_id, feed=feed_id)
+        feed_obj = get_object_or_404(Feed, id=feed_id)
+        data = dict(request.data) #, feed_id=feed_id, feed=feed_id)
 
-        s = PostCreateSerializer(data=data, context=dict(feed_id=feed_id), many=True, allow_empty=False)
+        s = CreatePostsSerializer(data=data, context=dict(feed_id=feed_id))
         s.is_valid(raise_exception=True)
 
         posts = s.save(added_manually=True, deleted_manually=False)

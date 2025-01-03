@@ -40,8 +40,6 @@ class FeedCreatedJobSerializer(FeedSerializer):
     job_state = serializers.CharField(read_only=True, help_text="only returns with POST /feeds/")
     
 
-
-
 class PostListSerializer(serializers.ListSerializer):
     child = None
 
@@ -94,9 +92,7 @@ class PostSerializer(serializers.ModelSerializer):
         return super().run_validation(data)
     
 class PostWithFeedIDSerializer(PostSerializer):
-    feed_id = serializers.UUIDField()
-    
-    
+    feed_id = serializers.UUIDField()    
 
 class PatchSerializer(serializers.Serializer):
     pass
@@ -128,6 +124,14 @@ class PostCreateSerializer(PostSerializer):
                 message='Post with link already exists in feed.',
             )
         ]
+
+    
+class CreatePostsSerializer(serializers.Serializer):
+    posts = PostCreateSerializer(many=True, allow_empty=False)
+
+    def create(self, validated_data):
+        posts = validated_data["posts"]
+        return self.fields['posts'].create(posts)
 
 
 
