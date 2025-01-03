@@ -20,7 +20,7 @@ from .utils import (
 from dogesec_commons.utils.serializers import CommonErrorSerializer
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import CreatePostsSerializer, FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, PostListSerializer, PostWithFeedIDSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
+from .serializers import CreatePostsSerializer, FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, PostPatchSerializer, PostWithFeedIDSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
 from .models import AUTO_TITLE_TRAIL, FulltextJob, Post, Feed, Job, FeedType
 from rest_framework import (
     viewsets,
@@ -114,7 +114,7 @@ class ErrorResp(Response):
         summary="Delete a Post by ID",
         description="This will delete the post inside of the feed. Deleting the post will remove it forever and it will not be reindexed on subsequent feed updates. The only way to re-index it is to add it manually.",
     ),
-    partial_update=extend_schema(
+    fetch=extend_schema(
         description=textwrap.dedent(
             """
             Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.
@@ -129,13 +129,23 @@ class ErrorResp(Response):
         summary="Update a Post in a Feed",
         responses={
             201: PostJobSerializer,
-            404: OpenApiResponse(CommonErrorSerializer, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
+            404: OpenApiResponse(CommonErrorSerializer, "post does not exist", examples=[HTTP404_EXAMPLE]),
         },
         request=PatchSerializer,
     ),
+    partial_update=extend_schema(
+        description="update post metadata",
+        summary="update post metadata",
+
+        responses={
+            201: PostSerializer,
+            404: OpenApiResponse(CommonErrorSerializer, "post does not exist", examples=[HTTP404_EXAMPLE]),
+        },
+        request=PostPatchSerializer,
+    ),
 
 )
-class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
+class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
     openapi_path_params = [POST_ID_PARAM]
     openapi_tags = ["Posts"]
     serializer_class = PostWithFeedIDSerializer
@@ -165,8 +175,22 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
     def get_queryset(self):
         return Post.visible_posts()
     
-      
     def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = PostPatchSerializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        s = self.get_serializer(instance)
+        return Response(s.data)
+    
+    @decorators.action(detail=True, methods=['PATCH'])
+    def fetch(self, request, *args, **kwargs):
         s = PatchSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         post: Post = self.get_object()

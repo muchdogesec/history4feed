@@ -129,6 +129,11 @@ class PostCreateSerializer(PostSerializer):
             )
         ]
 
+class PostPatchSerializer(PostSerializer):
+    class Meta:
+        model = Post
+        fields = ["title", "pubdate", "author", "categories"]
+
     
 class CreatePostsSerializer(serializers.Serializer):
     posts = PostCreateSerializer(many=True, allow_empty=False)
