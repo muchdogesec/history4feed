@@ -134,8 +134,13 @@ class CreatePostsSerializer(serializers.Serializer):
     posts = PostCreateSerializer(many=True, allow_empty=False)
 
     def create(self, validated_data):
-        posts = validated_data["posts"]
+        posts = [{**post, **self.save_kwargs} for post in validated_data["posts"]]
+        
         return self.fields['posts'].create(posts)
+    
+    def save(self, **kwargs):
+        self.save_kwargs = kwargs
+        return super().save(**kwargs)
 
 
 
