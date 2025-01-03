@@ -111,16 +111,20 @@ class FeedFetchSerializer(FeedPatchSerializer, FeedSerializer):
         fields = ['include_remote_blogs']
 
 class PostCreateSerializer(PostSerializer):
-    # feed_id = serializers.UUIDField(source='feed')
     link = serializers.URLField(validators=[normalize_url])
+    class feed_class(serializers.HiddenField):
+        def get_default(self):
+            return self.context.get('feed_id')
+    feed_id = feed_class(default=None)
+        
     class Meta:
         list_serializer_class = PostListSerializer
         model = Post
-        fields = ["title", "link", "pubdate", "author", "categories", "feed"]
+        fields = ["title", "link", "pubdate", "author", "categories", "feed_id"]
         validators = [
             validators.UniqueTogetherValidator(
                 queryset=Post.visible_posts(),
-                fields=('feed', 'link'),
+                fields=('feed_id', 'link'),
                 message='Post with link already exists in feed.',
             )
         ]

@@ -109,7 +109,30 @@ class ErrorResp(Response):
             404: OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
             400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
-    )
+    ),
+    destroy=extend_schema(
+        summary="Delete a Post by ID",
+        description="This will delete the post inside of the feed. Deleting the post will remove it forever and it will not be reindexed on subsequent feed updates. The only way to re-index it is to add it manually.",
+    ),
+    partial_update=extend_schema(
+        description=textwrap.dedent(
+            """
+            Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.
+
+            The following key/values are accepted in the body of the request:
+
+            IMPORTANT: This action will delete the original post content making it irretrievable.
+
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+            """
+        ),
+        summary="Update a Post in a Feed",
+        responses={
+            201: PostJobSerializer,
+            404: OpenApiResponse(CommonErrorSerializer, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
+        },
+        request=PatchSerializer,
+    ),
 
 )
 class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -141,6 +164,24 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
 
     def get_queryset(self):
         return Post.visible_posts()
+    
+      
+    def partial_update(self, request, *args, **kwargs):
+        s = PatchSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        post: Post = self.get_object()
+        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
+        job_resp = JobSerializer(job_obj).data.copy()
+        job_resp.update(post_id=post.id)
+        return Response(job_resp, status=status.HTTP_201_CREATED)
+
+    def destroy(self, *args, **kwargs):
+        obj = self.get_object()
+        obj.deleted_manually = True
+        obj.save()
+        obj.feed.save()
+        return Response(None, status=status.HTTP_204_NO_CONTENT)
+
 
 
 class FeedView(viewsets.ModelViewSet):
@@ -401,10 +442,6 @@ class FeedView(viewsets.ModelViewSet):
 
 
 @extend_schema_view(
-    destroy=extend_schema(
-        summary="Delete a Feed by ID",
-        description="This will delete the post inside of the feed. Deleting the post will remove it forever and it will not be reindexed on subsequent feed updates. The only way to re-index it is to add it manually.",
-    ),
     retrieve=extend_schema(
         parameters=[FEED_ID_PARAM, POST_ID_PARAM],
         summary="Get a Post in a Feed",
@@ -432,29 +469,10 @@ class FeedView(viewsets.ModelViewSet):
             400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
     ),
-    partial_update=extend_schema(
-        description=textwrap.dedent(
-            """
-            Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.
-
-            The following key/values are accepted in the body of the request:
-
-            IMPORTANT: This action will delete the original post content making it irretrievable.
-
-            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
-            """
-        ),
-        summary="Update a Post in a Feed",
-        responses={
-            201: PostJobSerializer,
-            404: OpenApiResponse(CommonErrorSerializer, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
-        },
-        request=PatchSerializer,
-    ),
 )
 
 class FeedPostView(
-    PostOnlyView
+    mixins.CreateModelMixin, viewsets.GenericViewSet
 ):
 
     openapi_tags = ["Feeds"]
@@ -494,15 +512,6 @@ class FeedPostView(
         body = build_rss.build_rss(feed_obj, page)
         return self.paginator.get_paginated_response(body)
     
-
-    def partial_update(self, request, *args, **kwargs):
-        s = PatchSerializer(data=request.data)
-        s.is_valid(raise_exception=True)
-        post: Post = self.get_object()
-        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
-        job_resp = JobSerializer(job_obj).data.copy()
-        job_resp.update(post_id=post.id)
-        return Response(job_resp, status=status.HTTP_201_CREATED)
     
     @extend_schema(
         parameters=[FEED_ID_PARAM],
@@ -546,14 +555,7 @@ class FeedPostView(
         job_resp = JobSerializer(job_obj).data.copy()
         # job_resp.update(post_id=post.id)
         return Response(job_resp, status=status.HTTP_201_CREATED)
-    
-    def destroy(self, *args, **kwargs):
-        obj = self.get_object()
-        obj.deleted_manually = True
-        obj.save()
-        obj.feed.save()
-        return Response(None, status=status.HTTP_204_NO_CONTENT)
-
+  
 
 
 class JobView(
