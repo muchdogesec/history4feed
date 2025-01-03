@@ -187,7 +187,7 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, mixins.Upda
             instance._prefetched_objects_cache = {}
 
         s = self.get_serializer(instance)
-        return Response(s.data)
+        return Response(s.data, status=status.HTTP_201_CREATED)
     
     @decorators.action(detail=True, methods=['PATCH'])
     def fetch(self, request, *args, **kwargs):
