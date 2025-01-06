@@ -163,7 +163,7 @@ class ErrorResp(Response):
     ),
 
 )
-class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
+class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
     openapi_path_params = [POST_ID_PARAM]
     openapi_tags = ["Posts"]
     serializer_class = PostWithFeedIDSerializer
