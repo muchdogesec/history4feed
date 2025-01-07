@@ -520,7 +520,9 @@ class FeedView(viewsets.ModelViewSet):
 )
 
 class FeedPostView(
-    mixins.CreateModelMixin, viewsets.GenericViewSet
+    mixins.CreateModelMixin, 
+    # viewsets.GenericViewSet, 
+    PostOnlyView,
 ):
 
     openapi_tags = ["Feeds"]
