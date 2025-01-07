@@ -20,7 +20,7 @@ from .utils import (
 from dogesec_commons.utils.serializers import CommonErrorSerializer
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, PostWithFeedIDSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
+from .serializers import CreatePostsSerializer, FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, PostPatchSerializer, PostWithFeedIDSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
 from .models import AUTO_TITLE_TRAIL, FulltextJob, Post, Feed, Job, FeedType
 from rest_framework import (
     viewsets,
@@ -109,7 +109,58 @@ class ErrorResp(Response):
             404: OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
             400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
-    )
+    ),
+    destroy=extend_schema(
+        summary="Delete a Post by ID",
+        description="This will delete the post inside of the feed. Deleting the post will remove it forever and it will not be reindexed on subsequent feed updates. The only way to re-index it is to add it manually.",
+    ),
+    fetch=extend_schema(
+        summary="Update a Post in a Feed",
+        description=textwrap.dedent(
+            """
+             When blog posts are modified at source, the RSS and ATOM feeds that serve them are not often updated with new modification. As such, fetching for blog will cause these updated posts to be missed.
+
+            To ensure the post stored in the database matches the one currently published you can make a request to this endpoint using the Post ID to update it.
+
+            This update will only change the content (`description`) stored for the Post. It will not update the `title`, `pubdate`, `author`, or `categories`. If you need to update these properties you can use the Update Post Metadata endpoint.
+
+            **IMPORTANT**: This action will delete the original post as well as all the STIX SDO and SRO objects created during the processing of the original text. Mostly this is not an issue, however, if the post has been removed at source you will end up with an empty entry for this Post.
+
+            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
+            """
+        ),
+        responses={
+            201: PostJobSerializer,
+            404: OpenApiResponse(CommonErrorSerializer, "post does not exist", examples=[HTTP404_EXAMPLE]),
+        },
+        request=PatchSerializer,
+    ),
+    partial_update=extend_schema(
+        summary="Update a Posts Metadata",
+        description=textwrap.dedent(
+            """
+            In most cases, the automatically indexed metadata (or user submitted metadata in the case of manually added Posts) will be fine.
+
+            However, these may be occasions you want to change the values of the `title`, `pubdate`, `author`, or `categories` for a Post.
+
+            The following key/values are accepted in the body of the request:
+
+            * `pubdate` (required): The date of the blog post in the format `YYYY-MM-DD`. history4feed cannot accurately determine a post date in all cases, so you must enter it manually.
+            * `title` (required):  history4feed cannot accurately determine the title of a post in all cases, so you must enter it manually.
+            * `author` (optional): the value to be stored for the author of the post.
+            * `categories` (optional) : the value(s) to be stored for the category of the post. Pass as a list like `["tag1","tag2"]`.
+
+            Only one key/value is required. If no values are passed, they will be remain unchanged from the current state.
+
+            It is not possible to manually modify any other values for the Post object. You can update the post content using the Update a Post in A Feed endpoint.
+            """
+        ),
+        responses={
+            201: PostSerializer,
+            404: OpenApiResponse(CommonErrorSerializer, "post does not exist", examples=[HTTP404_EXAMPLE]),
+        },
+        request=PostPatchSerializer,
+    ),
 
 )
 class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -141,6 +192,38 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
 
     def get_queryset(self):
         return Post.visible_posts()
+    
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = PostPatchSerializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        s = self.get_serializer(instance)
+        return Response(s.data, status=status.HTTP_201_CREATED)
+    
+    @decorators.action(detail=True, methods=['PATCH'])
+    def fetch(self, request, *args, **kwargs):
+        s = PatchSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        post: Post = self.get_object()
+        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
+        job_resp = JobSerializer(job_obj).data.copy()
+        job_resp.update(post_id=post.id)
+        return Response(job_resp, status=status.HTTP_201_CREATED)
+
+    def destroy(self, *args, **kwargs):
+        obj = self.get_object()
+        obj.deleted_manually = True
+        obj.save()
+        obj.feed.save()
+        return Response(None, status=status.HTTP_204_NO_CONTENT)
+
 
 
 class FeedView(viewsets.ModelViewSet):
@@ -190,7 +273,7 @@ class FeedView(viewsets.ModelViewSet):
         return Feed.objects.all().annotate(count_of_posts=Count("posts"))
 
     @extend_schema(
-        summary="Create a new Feed",
+        summary="Create a New Feed",
         description=textwrap.dedent(
             """
             Use this endpoint to create to a new feed.
@@ -248,7 +331,7 @@ class FeedView(viewsets.ModelViewSet):
 
 
     @extend_schema(
-        summary="Create a new Skeleton Feed",
+        summary="Create a New Skeleton Feed",
         description=textwrap.dedent(
             """
             Sometimes blogs don't have an RSS or ATOM feed. It might also be the case you want to curate a blog manually using various URLs. This is what `skeleton` feeds are designed for, allowing you to create a skeleton feed and then add posts to it manually later on using the add post manually endpoint.
@@ -282,7 +365,7 @@ class FeedView(viewsets.ModelViewSet):
         request=FeedPatchSerializer,
         description=textwrap.dedent(
             """
-            Update the metadata of the Feed. To leave a property unchanged from its current state do not pass it in the request.
+            Update the metadata of the Feed.
 
             Note, it is not possible to update the `url` of the feed. You must delete the Feed and add it again to modify the `url`.
 
@@ -291,6 +374,8 @@ class FeedView(viewsets.ModelViewSet):
             * `title` (optional): update the `title` of the Feed
             * `description` (optional): update the `description` of the Feed
             * `pretty_url` (optional): update the `pretty_url of the Feed
+
+            Only one/key value is required in the request. For those not passed, the current value will remain unchanged.
 
             The response will contain the newly updated Feed object.
             """
@@ -310,17 +395,21 @@ class FeedView(viewsets.ModelViewSet):
     
     @extend_schema(
         parameters=[FEED_ID_PARAM],
-        summary="Fetch new Post for a Feed",
+        summary="Fetch Updates for a Feed",
         request=FeedFetchSerializer,
         description=textwrap.dedent(
             """
-            Use this endpoint to check for new posts on this blog since the last update time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.
+            Use this endpoint to check for new posts on this blog since the last post time. An update request will immediately trigger a job to get the posts between `latest_item_pubdate` for feed and time you make a request to this endpoint.
 
-            Note, this endpoint can miss updates to currently indexed posts (where the RSS or ATOM feed does not report the updated correctly -- which is very common). To solve this issue for currently indexed blog posts, use the Update Post endpoint.
+            Note, this endpoint can miss updates that have happened to currently indexed posts (where the RSS or ATOM feed does not report the updated date correctly -- which is actually very common). To solve this issue for currently indexed blog posts, use the Update a Post in a Feed endpoint directly.
 
             The following key/values are accepted in the body of the request:
 
              * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to `false`. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.
+
+            Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` (history4feed) and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).
+
+            IMPORTANT: this request will fail if run against a Skeleton type feed. Skeleton feeds can only be updated by adding posts to them manually using the Manually Add a Post to a Feed endpoint.
 
             The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
             """
@@ -401,10 +490,6 @@ class FeedView(viewsets.ModelViewSet):
 
 
 @extend_schema_view(
-    destroy=extend_schema(
-        summary="Delete a Feed by ID",
-        description="This will delete the post inside of the feed. Deleting the post will remove it forever and it will not be reindexed on subsequent feed updates. The only way to re-index it is to add it manually.",
-    ),
     retrieve=extend_schema(
         parameters=[FEED_ID_PARAM, POST_ID_PARAM],
         summary="Get a Post in a Feed",
@@ -432,29 +517,10 @@ class FeedView(viewsets.ModelViewSet):
             400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
         },
     ),
-    partial_update=extend_schema(
-        description=textwrap.dedent(
-            """
-            Occasionally updates to blog posts are not reflected in RSS and ATOM feeds. To ensure the post stored in history4feed matches the currently published post you make a request to this endpoint using the Post ID to update it.
-
-            The following key/values are accepted in the body of the request:
-
-            IMPORTANT: This action will delete the original post content making it irretrievable.
-
-            The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
-            """
-        ),
-        summary="Update a Post in a Feed",
-        responses={
-            201: PostJobSerializer,
-            404: OpenApiResponse(CommonErrorSerializer, "Feed or post does not exist", examples=[HTTP404_EXAMPLE]),
-        },
-        request=PatchSerializer,
-    ),
 )
 
 class FeedPostView(
-    PostOnlyView
+    mixins.CreateModelMixin, viewsets.GenericViewSet
 ):
 
     openapi_tags = ["Feeds"]
@@ -494,22 +560,17 @@ class FeedPostView(
         body = build_rss.build_rss(feed_obj, page)
         return self.paginator.get_paginated_response(body)
     
-
-    def partial_update(self, request, *args, **kwargs):
-        s = PatchSerializer(data=request.data)
-        s.is_valid(raise_exception=True)
-        post: Post = self.get_object()
-        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
-        job_resp = JobSerializer(job_obj).data.copy()
-        job_resp.update(post_id=post.id)
-        return Response(job_resp, status=status.HTTP_201_CREATED)
     
     @extend_schema(
         parameters=[FEED_ID_PARAM],
-        summary="Add a Post manually to a Feed",
+        summary="Manually Add a Post to A Feed",
         description=textwrap.dedent(
             """
-            This endpoint allows you to add Posts manually to a Feed. This endpoint is designed to ingest posts that are not identified by the Wayback Machine (used by the POST Feed endpoint during ingestion). If the feed you want to add a post to does not already exist, you should first add it using the POST Feed endpoint.
+            Sometimes historic posts are missed when a feed is indexed (typically when no Wayback Machine archive exists).
+
+            This endpoint allows you to add Posts manually to a Feed.
+
+            If the feed you want to add a post to does not already exist, you should first add it using the POST Feed or POST skeleton feed endpoints.
 
             The following key/values are accepted in the body of the request:
 
@@ -530,34 +591,23 @@ class FeedPostView(
             201: PostJobSerializer,
             404: OpenApiResponse(CommonErrorSerializer, "Feed does not exist", examples=[HTTP404_EXAMPLE]),
         },
+        request=CreatePostsSerializer,
     )
     def create(self, request, *args, feed_id=None, **kwargs):
         deleted_obj = None
-        data = dict(**request.data, feed_id=feed_id, feed=feed_id)
+        feed_obj = get_object_or_404(Feed, id=feed_id)
+        data = dict(request.data) #, feed_id=feed_id, feed=feed_id)
 
-        s = PostSerializer(data=data)
+        s = CreatePostsSerializer(data=data, context=dict(feed_id=feed_id))
         s.is_valid(raise_exception=True)
 
-        try:
-            deleted_obj = Post.objects.get(feed_id=feed_id, link=s.data['link'])
-        except Exception as e:
-            pass
+        posts = s.save(added_manually=True, deleted_manually=False)
 
-        s2 = PostCreateSerializer(deleted_obj, data=data)
-        s2.is_valid(raise_exception=True)
-        post = s2.save(added_manually=True, deleted_manually=False)
-        job_obj = task_helper.new_patch_posts_job(post.feed, [post])
+        job_obj = task_helper.new_patch_posts_job(posts[0].feed, posts)
         job_resp = JobSerializer(job_obj).data.copy()
-        job_resp.update(post_id=post.id)
+        # job_resp.update(post_id=post.id)
         return Response(job_resp, status=status.HTTP_201_CREATED)
-    
-    def destroy(self, *args, **kwargs):
-        obj = self.get_object()
-        obj.deleted_manually = True
-        obj.save()
-        obj.feed.save()
-        return Response(None, status=status.HTTP_204_NO_CONTENT)
-
+  
 
 
 class JobView(

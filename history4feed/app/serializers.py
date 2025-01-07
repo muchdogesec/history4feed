@@ -40,9 +40,47 @@ class FeedCreatedJobSerializer(FeedSerializer):
     job_state = serializers.CharField(read_only=True, help_text="only returns with POST /feeds/")
     
 
+class PostListSerializer(serializers.ListSerializer):
+    child = None
+
+    @property
+    def feed_id(self):
+        return self.context.get('feed_id')
+    
+
+    def run_child_validation(self, data):
+        """
+        Run validation on child serializer.
+        You may need to override this method to support multiple updates. For example:
+
+        self.child.instance = self.instance.get(pk=data['id'])
+        self.child.initial_data = data
+        return super().run_child_validation(data)
+        """
+        data.setdefault('feed', self.feed_id)
+        return self.child.run_validation(data)
+    
+    def create(self, validated_data: list[dict]):
+        instances = []
+        for attrs in validated_data:
+            feed_id = attrs.setdefault('feed_id', self.feed_id)
+            instance = None
+            try:
+                instance = Post.objects.get(feed_id=feed_id, link=attrs['link'])
+            except:
+                pass
+            if instance:
+                instance = self.child.update(instance, attrs)
+            else:
+                instance = self.child.create(attrs)
+
+            instances.append(instance)
+        return instances
+
 class PostSerializer(serializers.ModelSerializer):
     # categories = serializers.ManyRelatedField()
     class Meta:
+        list_serializer_class = PostListSerializer
         model = Post
         exclude = ['feed', 'deleted_manually']
         read_only_fields = ["id", "datetime_updated", "datetime_added", "description", "is_full_text", "content_type", "added_manually"]
@@ -54,8 +92,7 @@ class PostSerializer(serializers.ModelSerializer):
         return super().run_validation(data)
     
 class PostWithFeedIDSerializer(PostSerializer):
-    feed_id = serializers.UUIDField()
-    
+    feed_id = serializers.UUIDField()    
 
 class PatchSerializer(serializers.Serializer):
     pass
@@ -74,18 +111,41 @@ class FeedFetchSerializer(FeedPatchSerializer, FeedSerializer):
         fields = ['include_remote_blogs']
 
 class PostCreateSerializer(PostSerializer):
-    # feed_id = serializers.UUIDField(source='feed')
     link = serializers.URLField(validators=[normalize_url])
+    class feed_class(serializers.HiddenField):
+        def get_default(self):
+            return self.context.get('feed_id')
+    feed_id = feed_class(default=None)
+        
     class Meta:
+        list_serializer_class = PostListSerializer
         model = Post
-        fields = ["title", "link", "pubdate", "author", "categories", "feed"]
+        fields = ["title", "link", "pubdate", "author", "categories", "feed_id"]
         validators = [
             validators.UniqueTogetherValidator(
                 queryset=Post.visible_posts(),
-                fields=('feed', 'link'),
-                message='Link already exists in field.',
+                fields=('feed_id', 'link'),
+                message='Post with link already exists in feed.',
             )
         ]
+
+class PostPatchSerializer(PostSerializer):
+    class Meta:
+        model = Post
+        fields = ["title", "pubdate", "author", "categories"]
+
+    
+class CreatePostsSerializer(serializers.Serializer):
+    posts = PostCreateSerializer(many=True, allow_empty=False)
+
+    def create(self, validated_data):
+        posts = [{**post, **self.save_kwargs} for post in validated_data["posts"]]
+        
+        return self.fields['posts'].create(posts)
+    
+    def save(self, **kwargs):
+        self.save_kwargs = kwargs
+        return super().save(**kwargs)
 
 
 

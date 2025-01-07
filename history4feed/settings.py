@@ -179,15 +179,15 @@ SPECTACULAR_SETTINGS = {
     'TAGS': [
         {
             "name": "Feeds",
-            "description": "Subscribe and retrieve blogs and blog posts"
+            "description": "Subscribe and retrieve Feeds"
         },
         {
             "name": "Posts",
-            "description": "Retrieve Posts from all blogs"
+            "description": "Retrieve Posts in Feeds"
         },
         {
             "name": "Jobs",
-            "description": "Check the status of data retrieval from blogs"
+            "description": "Check the status of data retrieval from Feeds"
         },
     ],
 
