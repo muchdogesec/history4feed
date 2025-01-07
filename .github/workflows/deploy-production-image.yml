@@ -41,7 +41,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            DJANGO_DEBUG=True
+            DJANGO_DEBUG=FALSE
             SCRAPFILE_APIKEY=${{ secrets.SCRAPFILE_APIKEY }}
             DJANGO_SECRET=${{ secrets.DJANGO_SECRET }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
