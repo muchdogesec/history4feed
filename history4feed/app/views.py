@@ -596,7 +596,6 @@ class FeedPostView(
         request=CreatePostsSerializer,
     )
     def create(self, request, *args, feed_id=None, **kwargs):
-        deleted_obj = None
         feed_obj = get_object_or_404(Feed, id=feed_id)
         data = dict(request.data) #, feed_id=feed_id, feed=feed_id)
 
@@ -605,11 +604,34 @@ class FeedPostView(
 
         posts = s.save(added_manually=True, deleted_manually=False)
 
-        job_obj = task_helper.new_patch_posts_job(posts[0].feed, posts)
+        job_obj = task_helper.new_patch_posts_job(feed_obj, posts)
         job_resp = JobSerializer(job_obj).data.copy()
         # job_resp.update(post_id=post.id)
         return Response(job_resp, status=status.HTTP_201_CREATED)
-  
+    
+
+    @extend_schema(
+        summary="Reindex a feed",
+        description=textwrap.dedent(
+            """
+                Refetch all the posts in a Feed
+            """
+        ),
+        responses={
+            201: PostJobSerializer,
+            404: OpenApiResponse(CommonErrorSerializer, "Feed does not exist", examples=[HTTP404_EXAMPLE]),
+        },
+        request={},
+    )
+    @decorators.action(methods=["PATCH"], detail=False)
+    def reindex(self, request, *args, feed_id=None, **kwargs):
+        posts = self.get_queryset().all()
+        feed_obj = get_object_or_404(Feed, id=feed_id)
+
+        job_obj = task_helper.new_patch_posts_job(feed_obj, posts)
+        job_resp = JobSerializer(job_obj).data.copy()
+        # job_resp.update(post_id=post.id)
+        return Response(job_resp, status=status.HTTP_201_CREATED)
 
 
 class JobView(

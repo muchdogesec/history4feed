@@ -168,4 +168,4 @@ class JobSerializer(serializers.ModelSerializer):
         exclude = ['feed']
 
 class PostJobSerializer(JobSerializer):
-    post_id = serializers.UUIDField()
+    pass
