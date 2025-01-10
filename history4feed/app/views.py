@@ -614,7 +614,11 @@ class FeedPostView(
         summary="Reindex a feed",
         description=textwrap.dedent(
             """
-                Refetch all the posts in a Feed
+                This endpoint will reindex the Post content (`description`) for all Post IDs currently listed in the Feed.
+
+                This request will only change the content (`description`) stored for the Post ID. It will not update the title, pubdate, author, or categories. If you need to update these properties you can use the Update Post Metadata endpoint.
+
+                Note, if you only want to update the content of a single post, it is much more effecient to use the Update a Post in a Feed endpoint.
             """
         ),
         responses={
