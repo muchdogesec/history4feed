@@ -611,7 +611,7 @@ class FeedPostView(
     
 
     @extend_schema(
-        summary="Reindex a feed",
+        summary="Update all Posts in a Feed",
         description=textwrap.dedent(
             """
                 This endpoint will reindex the Post content (`description`) for all Post IDs currently listed in the Feed.
