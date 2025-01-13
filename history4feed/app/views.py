@@ -114,7 +114,7 @@ class ErrorResp(Response):
         summary="Delete a Post by ID",
         description="This will delete the post inside of the feed. Deleting the post will remove it forever and it will not be reindexed on subsequent feed updates. The only way to re-index it is to add it manually.",
     ),
-    fetch=extend_schema(
+    reindex=extend_schema(
         summary="Update a Post in a Feed",
         description=textwrap.dedent(
             """
@@ -208,7 +208,7 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
         return Response(s.data, status=status.HTTP_201_CREATED)
     
     @decorators.action(detail=True, methods=['PATCH'])
-    def fetch(self, request, *args, **kwargs):
+    def reindex(self, request, *args, **kwargs):
         s = PatchSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         post: Post = self.get_object()
@@ -627,8 +627,8 @@ class FeedPostView(
         },
         request={},
     )
-    @decorators.action(methods=["PATCH"], detail=False)
-    def reindex(self, request, *args, feed_id=None, **kwargs):
+    @decorators.action(methods=["PATCH"], detail=False, url_path='reindex')
+    def reindex_feed(self, request, *args, feed_id=None, **kwargs):
         posts = self.get_queryset().all()
         feed_obj = get_object_or_404(Feed, id=feed_id)
 
