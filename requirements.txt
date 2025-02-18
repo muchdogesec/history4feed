@@ -6,7 +6,6 @@ billiard==4.2.0; python_version >= '3.7'
 brotlipy==0.7.0
 celery==5.4.0; python_version >= '3.8'
 certifi==2024.7.4; python_version >= '3.6'
-cffi==1.16.0; python_version >= '3.8'
 chardet==5.2.0; python_version >= '3.7'
 charset-normalizer==3.3.2; python_full_version >= '3.7.0'
 click==8.1.7; python_version >= '3.7'
@@ -37,7 +36,6 @@ readability-lxml==0.8.1
 redis==5.0.4; python_version >= '3.7'
 referencing==0.35.1; python_version >= '3.8'
 requests==2.32.3; python_version >= '3.8'
-rpds-py==0.18.1; python_version >= '3.8'
 schemathesis==3.38.7; python_version >= '3.8'
 six==1.16.0; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'
 sqlparse==0.5.0; python_version >= '3.8'
@@ -49,4 +47,4 @@ wcwidth==0.2.13
 fake-useragent==1.5.1
 whitenoise==6.7.0
 hyperlink==21.0.0
-dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2024-11-28-15-33-31/dogesec_commons-0.0.1b2-py3-none-any.whl
+dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/massive-modification-2025-02-18-14-12-32/dogesec_commons-0.0.6-py3-none-any.whl

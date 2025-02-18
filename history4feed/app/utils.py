@@ -3,12 +3,9 @@ from rest_framework.filters import OrderingFilter, BaseFilterBackend
 from django.utils.encoding import force_str
 from django.db.models import Q
 from datetime import datetime
-from django.conf import settings
 import typing
 from dogesec_commons.utils import Pagination, Ordering
 
-if typing.TYPE_CHECKING:
-    from ..import settings
 
 class MinMaxDateFilter(BaseFilterBackend):
     min_val = datetime.min

@@ -1,5 +1,5 @@
-from rest_framework import serializers, validators
-from .models import AUTO_TITLE_TRAIL, FEED_DESCRIPTION_MAX_LENGTH, Category, Feed, Post, Job, normalize_url, FeedType
+from rest_framework import serializers, validators, exceptions
+from .models import AUTO_TITLE_TRAIL, FEED_DESCRIPTION_MAX_LENGTH, Category, Feed, Post, Job, normalize_url, FeedType, title_as_string
 from django.db import models as django_models
 from django.utils.translation import gettext_lazy as _
 
@@ -7,10 +7,10 @@ class TitleField(serializers.CharField):
     def to_internal_value(self, data):
         return super().to_internal_value(data)
     def to_representation(self, value):
-        value = super().to_representation(value)
-        if value.endswith(AUTO_TITLE_TRAIL):
-            value = value[:-len(AUTO_TITLE_TRAIL)]
-        return value
+        return title_as_string(super().to_representation(value))
+    
+class InvalidFeed(exceptions.APIException):
+    status_code = 406
 
 class FeedSerializer(serializers.ModelSerializer):
     count_of_posts = serializers.IntegerField(source='get_post_count', read_only=True, help_text="Number of posts in feed")
@@ -92,7 +92,7 @@ class PostSerializer(serializers.ModelSerializer):
         return super().run_validation(data)
     
 class PostWithFeedIDSerializer(PostSerializer):
-    feed_id = serializers.UUIDField()    
+    feed_id = serializers.UUIDField()
 
 class PatchSerializer(serializers.Serializer):
     pass
