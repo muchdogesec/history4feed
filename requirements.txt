@@ -13,7 +13,7 @@ click-didyoumean==0.3.1; python_full_version >= '3.6.2'
 click-plugins==1.1.1
 click-repl==0.3.0; python_version >= '3.6'
 cssselect==1.2.0; python_version >= '3.7'
-django==5.0.11; python_version >= '3.10'
+django==5.1.6; python_version >= '3.10'
 django-filter==24.2; python_version >= '3.8'
 djangorestframework==3.15.2; python_version >= '3.6'
 drf-spectacular==0.27.2; python_version >= '3.7'
