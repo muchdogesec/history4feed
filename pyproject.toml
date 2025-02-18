@@ -19,14 +19,14 @@ classifiers = [
 dependencies = [
     "djangorestframework>=3.15.2",
     "drf-spectacular>=0.27.2",
-    "celery==5.4.0; python_version >= '3.8'",
-    "psycopg2-binary==2.9.10",
-    "redis==5.1.0b5; python_version >= '3.8'",
-    "brotlipy==0.7.0",
-    "lxml-html-clean==0.4.1",
-    "fake-useragent==1.5.1",
+    "celery>=5.4.0; python_version >= '3.8'",
+    "psycopg2-binary>=2.9.10",
+    "redis",
+    "brotlipy>=0.7.0",
+    "lxml-html-clean>=0.4.1",
+    "fake-useragent>=1.5.1",
     "hyperlink",
-    "django-filter==24.2",
+    "django-filter>=24.2",
   ]
 [project.urls]
 Homepage = "https://github.com/muchdogesec/history4feed"
