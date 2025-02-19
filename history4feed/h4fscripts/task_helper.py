@@ -5,10 +5,9 @@ from celery.result import ResultSet, AsyncResult
 import redis
 
 from ..app import models
-from django.conf import settings
 from . import h4f, wayback_helpers, logger, exceptions
 from datetime import datetime
-from django.conf import settings
+from history4feed.app.settings import history4feed_server_settings as settings
 
 from urllib.parse import urlparse
 from contextlib import contextmanager

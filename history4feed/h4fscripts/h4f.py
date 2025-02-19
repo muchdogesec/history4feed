@@ -2,7 +2,7 @@ import time
 from io import BytesIO, StringIO
 from xml.dom.minidom import Element, parse
 import os
-from django.conf import settings
+from history4feed.app.settings import history4feed_server_settings as settings
 import requests
 from dateutil.parser import parse as parse_date
 from readability import Document as ReadabilityDocument
@@ -40,11 +40,11 @@ class FatalError(Exception):
     pass
 
 def fetch_page(session, url, headers=None) -> tuple[bytes, str, str]:
-    proxy_apikey = os.getenv("SCRAPFILE_APIKEY")
+    proxy_apikey = os.getenv("SCRAPFLY_APIKEY")
     headers = headers or {}
 
     if proxy_apikey:
-        logger.info(f"Fetching `{url}` via scrapfile.io")
+        logger.info(f"Fetching `{url}` via scrapfly.io")
         headers = dict((f"headers[{k}]", v) for k, v in headers.items())
         resp = session.get("https://api.scrapfly.io/scrape", params=dict(**headers, key=proxy_apikey, url=url, country="us,ca,mx,gb,fr,de,au,at,be,hr,cz,dk,ee,fi,ie,se,es,pt,nl"))
         json_data = resp.json()

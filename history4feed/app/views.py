@@ -21,7 +21,7 @@ from dogesec_commons.utils.serializers import CommonErrorSerializer
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
 from .serializers import CreatePostsSerializer, FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, PostPatchSerializer, PostWithFeedIDSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
-from .models import AUTO_TITLE_TRAIL, FulltextJob, Post, Feed, Job, FeedType
+from .models import AUTO_TITLE_TRAIL, FulltextJob, JobState, Post, Feed, Job, FeedType
 from rest_framework import (
     viewsets,
     request,
@@ -54,6 +54,8 @@ from django_filters.rest_framework import (
 from django.db.models import Count, Q, Subquery, OuterRef
 from datetime import datetime
 import textwrap
+
+from history4feed.app import serializers
 
 
 class Response(response.Response):
@@ -170,7 +172,7 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
     lookup_url_kwarg = "post_id"
     pagination_class = Pagination("posts")
     filter_backends = [DjangoFilterBackend, Ordering, MinMaxDateFilter]
-    ordering_fields = ["pubdate", "title"]
+    ordering_fields = ["pubdate", "title", "datetime_updated", "datetime_added"]
     ordering = ["-pubdate"]
     minmax_date_fields = ["pubdate"]
 
@@ -189,9 +191,12 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
             lookup_expr="icontains",
         )
         job_id = Filter(help_text="Filter the Post by Job ID the Post was downloaded in.", field_name="fulltext_jobs__job_id")
+        job_state = filters.ChoiceFilter(choices=JobState.choices, help_text="Filter by job status")
+        updated_after = Filter(help_text="Only show posts updated after date/time. It must be in YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]", field_name="datetime_updated", lookup_expr="gt")
 
     def get_queryset(self):
-        return Post.visible_posts()
+        return Post.visible_posts() \
+                .annotate(job_state=Subquery(Job.objects.filter(pk=OuterRef('last_job_id')).values('state')[:1]))
     
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -209,13 +214,17 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
     
     @decorators.action(detail=True, methods=['PATCH'])
     def reindex(self, request, *args, **kwargs):
+        post, job_obj = self.new_reindex_post_job(request)
+        job_resp = JobSerializer(job_obj).data.copy()
+        job_resp.update(post_id=post.id)
+        return Response(job_resp, status=status.HTTP_201_CREATED)
+
+    def new_reindex_post_job(self, request):
         s = PatchSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         post: Post = self.get_object()
         job_obj = task_helper.new_patch_posts_job(post.feed, [post])
-        job_resp = JobSerializer(job_obj).data.copy()
-        job_resp.update(post_id=post.id)
-        return Response(job_resp, status=status.HTTP_201_CREATED)
+        return post, job_obj
 
     def destroy(self, *args, **kwargs):
         obj = self.get_object()
@@ -302,13 +311,23 @@ class FeedView(viewsets.ModelViewSet):
     )
     def create(self, request: request.Request, **kwargs):
 
+        job_obj = self.new_create_job(request)
+        resp_data = self.serializer_class().data.copy()
+        resp_data.update(
+            job_state=job_obj.state,
+            job_id=job_obj.id,
+        )
+        return Response(resp_data, status=status.HTTP_201_CREATED)
+    
+    def new_create_job(self, request: request.Request):
+        
         s = FeedSerializer(data=request.data)
         s.is_valid(raise_exception=True)
 
         try:
             feed_data = h4f.parse_feed_from_url(s.data["url"])
         except Exception as e:
-            return ErrorResp(406, "Invalid feed url", details={"error": str(e)})
+            raise serializers.InvalidFeed(s.data["url"])
 
         for k in ['title', 'description']:
             if v := s.validated_data.get(k):
@@ -321,14 +340,7 @@ class FeedView(viewsets.ModelViewSet):
 
         feed_obj: Feed = s.save(feed_type=feed_data['feed_type'])
         job_obj = task_helper.new_job(feed_obj, s.validated_data.get('include_remote_blogs', False))
-
-        resp_data = self.serializer_class(feed_obj).data.copy()
-        resp_data.update(
-            job_state=job_obj.state,
-            job_id=job_obj.id,
-        )
-        return Response(resp_data, status=status.HTTP_201_CREATED)
-
+        return job_obj
 
     @extend_schema(
         summary="Create a New Skeleton Feed",
@@ -422,19 +434,22 @@ class FeedView(viewsets.ModelViewSet):
     )
     @decorators.action(methods=["PATCH"], detail=True)
     def fetch(self, request, *args, **kwargs):
+        job_obj = self.new_fetch_job(request)
+        feed = self.serializer_class(self.get_object()).data.copy()
+        feed.update(
+            job_state=job_obj.state,
+            job_id=job_obj.id,
+        )
+        return Response(feed, status=status.HTTP_201_CREATED)
+
+    def new_fetch_job(self, request):
         feed_obj: Feed = self.get_object()
         if feed_obj.feed_type == FeedType.SKELETON:
             raise validators.ValidationError(f"fetch not supported for feed of type {feed_obj.feed_type}")
         s = FeedFetchSerializer(feed_obj, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
         s.save()
-        job_obj = task_helper.new_job(feed_obj, s.validated_data.get('include_remote_blogs', False))
-        feed = self.serializer_class(feed_obj).data.copy()
-        feed.update(
-            job_state=job_obj.state,
-            job_id=job_obj.id,
-        )
-        return Response(feed, status=status.HTTP_201_CREATED)
+        return task_helper.new_job(feed_obj, s.validated_data.get('include_remote_blogs', False))
 
     @extend_schema(
         summary="Search for Feeds",
@@ -519,10 +534,9 @@ class FeedView(viewsets.ModelViewSet):
     ),
 )
 
-class FeedPostView(
-    mixins.CreateModelMixin, 
-    # viewsets.GenericViewSet, 
-    PostOnlyView,
+class feed_post_view(
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet
 ):
 
     openapi_tags = ["Feeds"]
@@ -596,6 +610,12 @@ class FeedPostView(
         request=CreatePostsSerializer,
     )
     def create(self, request, *args, feed_id=None, **kwargs):
+        job_obj = self.new_create_post_job(request, feed_id)
+        job_resp = JobSerializer(job_obj).data.copy()
+        # job_resp.update(post_id=post.id)
+        return Response(job_resp, status=status.HTTP_201_CREATED)
+
+    def new_create_post_job(self, request, feed_id):
         feed_obj = get_object_or_404(Feed, id=feed_id)
         data = dict(request.data) #, feed_id=feed_id, feed=feed_id)
 
@@ -605,9 +625,7 @@ class FeedPostView(
         posts = s.save(added_manually=True, deleted_manually=False)
 
         job_obj = task_helper.new_patch_posts_job(feed_obj, posts)
-        job_resp = JobSerializer(job_obj).data.copy()
-        # job_resp.update(post_id=post.id)
-        return Response(job_resp, status=status.HTTP_201_CREATED)
+        return job_obj
     
 
     @extend_schema(
@@ -629,14 +647,24 @@ class FeedPostView(
     )
     @decorators.action(methods=["PATCH"], detail=False, url_path='reindex')
     def reindex_feed(self, request, *args, feed_id=None, **kwargs):
-        posts = self.get_queryset().all()
-        feed_obj = get_object_or_404(Feed, id=feed_id)
-
-        job_obj = task_helper.new_patch_posts_job(feed_obj, posts)
+        job_obj = self.new_reindex_feed_job(feed_id)
         job_resp = JobSerializer(job_obj).data.copy()
         # job_resp.update(post_id=post.id)
         return Response(job_resp, status=status.HTTP_201_CREATED)
 
+    def new_reindex_feed_job(self, feed_id):
+        posts = self.get_queryset().all()
+        feed_obj = get_object_or_404(Feed, id=feed_id)
+
+        job_obj = task_helper.new_patch_posts_job(feed_obj, posts)
+        return job_obj
+
+
+class FeedPostView(
+    PostOnlyView,
+    feed_post_view
+):
+    pass
 
 class JobView(
     mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet

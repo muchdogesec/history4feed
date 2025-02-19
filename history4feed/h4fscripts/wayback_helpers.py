@@ -1,10 +1,10 @@
 import json
 import time
 from datetime import datetime as dt
-from django.conf import settings
 from collections import namedtuple
 from urllib.parse import urlencode
 from .h4f import FatalError, fetch_page_with_retries
+from history4feed.app.settings import history4feed_server_settings as settings
 
 DEFAULT_USER_AGENT = "curl"
 
