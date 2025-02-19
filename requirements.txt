@@ -47,4 +47,4 @@ wcwidth==0.2.13
 fake-useragent==1.5.1
 whitenoise==6.7.0
 hyperlink==21.0.0
-dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/massive-modification-2025-02-18-14-12-32/dogesec_commons-0.0.6-py3-none-any.whl
+dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2025-02-19-09-12-17/dogesec_commons-0.0.6-py3-none-any.whl
