@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import time
 from io import BytesIO, StringIO
 from xml.dom.minidom import Element, parse
@@ -76,6 +77,17 @@ def parse_feed_from_url(url):
     data, content_type, url = fetch_page_with_retries(url, retry_count=0)
     return parse_feed_from_content(data, url)
 
+
+@dataclass
+class PostDict:
+    link: str
+    title: str
+    pubdate: str
+    author: str = None
+    categories: list[str] = None
+    description: str = "EMPTY BODY"
+    content_type: str =  "text/html"
+
 def parse_feed_from_content(data: bytes, url: str):
     feed_data = {}
     try:
@@ -128,7 +140,7 @@ def get_author(item):
 
 
 def parse_items(elem, link):
-    return SimpleNamespace(
+    return PostDict(
         # element = elem,
         link = link,
         title = getText(getFirstElementByTag(elem, "title")),
@@ -139,7 +151,7 @@ def parse_items(elem, link):
         content_type="plain/text",
     )
 
-def parse_posts_from_rss_feed(base_url, data):
+def parse_posts_from_rss_feed(base_url, data) -> dict[str, PostDict]:
     entries = {}
     document = parse(BytesIO(data))
     channel = getFirstElementByTag(document, "channel")
@@ -187,3 +199,4 @@ def get_full_text(link):
         return doc.summary(), content_type
     except BaseException as e:
         raise history4feedException(f"Error processing fulltext: {e}") from e
+    

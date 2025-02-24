@@ -4,9 +4,11 @@ import celery
 from celery.result import ResultSet, AsyncResult
 import redis
 
+from history4feed.h4fscripts.sitemap_helpers import fetch_posts_links_with_serper
+
 from ..app import models
 from . import h4f, wayback_helpers, logger, exceptions
-from datetime import datetime
+from datetime import UTC, datetime
 from history4feed.app.settings import history4feed_server_settings as settings
 
 from urllib.parse import urlparse
@@ -37,7 +39,7 @@ def new_job(feed: models.Feed, include_remote_blogs):
         job_obj = models.Job.objects.create(
             feed=feed,
             earliest_item_requested=feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE,
-            latest_item_requested=datetime.now(),
+            latest_item_requested=datetime.now(UTC),
             include_remote_blogs=include_remote_blogs,
         )
         if not queue_lock(feed, job_obj):
@@ -77,6 +79,8 @@ def start_job(job_id):
     job.state = models.JobState.RUNNING
     job.save()
     try:
+        if feed.feed_type == models.FeedType.SEARCH_INDEX:
+            return [feed.url]
         return wayback_helpers.get_wayback_urls(feed.url, job.earliest_item_requested, job.latest_item_requested)
     except BaseException as e:
         job.state = models.JobState.FAILED
@@ -101,8 +105,18 @@ def retrieve_posts_from_links(urls, job_id):
     feed = full_text_chain.feed
     chains = []
     parsed_feed = {}
+    job = models.Job.objects.get(id=job_id)
     for index, url in enumerate(urls):
-        parsed_feed, posts, error = retrieve_posts_from_url(url, feed, job_id)
+        error = None
+        if feed.feed_type == models.FeedType.SEARCH_INDEX:
+            print(job.run_datetime, settings.EARLIEST_SEARCH_DATE, feed.freshness)
+            start_time = feed.freshness or settings.EARLIEST_SEARCH_DATE
+            if not start_time.tzinfo:
+                start_time = start_time.replace(tzinfo=UTC)
+            crawled_posts = fetch_posts_links_with_serper(url, from_time=start_time, to_time=job.run_datetime)
+            posts = [add_new_post(feed, job, post_dict) for post_dict in crawled_posts.values()]
+        else:
+            parsed_feed, posts, error = retrieve_posts_from_url(url, feed, job)
         if error:
             logger.exception(error)
             continue
@@ -121,8 +135,10 @@ def retrieve_posts_from_links(urls, job_id):
         full_text_chain = celery.chain(chain_tasks)
         chains.append(full_text_chain.apply_async())
 
-    feed.set_description(parsed_feed['description'])
-    feed.set_title(parsed_feed['title'])
+    if parsed_feed:
+        feed.set_description(parsed_feed['description'])
+        feed.set_title(parsed_feed['title'])
+    feed.freshness = job.run_datetime
     
     feed.save()
     logger.info("====\n"*5)
@@ -141,12 +157,11 @@ def collect_and_schedule_removal(sender, job_id):
         job.state = models.JobState.SUCCESS
         job.save()
 
-def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
+def retrieve_posts_from_url(url, db_feed: models.Feed, job: models.Job):
     back_off_seconds = settings.WAYBACK_SLEEP_SECONDS
     all_posts: list[models.Post] = []
     error = None
     parsed_feed = {}
-    job = models.Job.objects.get(id=job_id)
     for i in range(settings.REQUEST_RETRY_COUNT):
         if i != 0:
             time.sleep(back_off_seconds)
@@ -161,20 +176,9 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
                 raise exceptions.UnknownFeedtypeException("unknown feed type `{}` at {}".format(parsed_feed['feed_type'], url))
             for post_dict in posts.values():
                 # make sure that post and feed share the same domain
-                if job.should_skip_post(post_dict.link):
-                    models.FulltextJob.objects.create(
-                            job_id=job_id,
-                            status=models.FullTextState.SKIPPED,
-                            link=post_dict.link,
-                    )
+                post = add_new_post(db_feed, job, post_dict)
+                if not post:
                     continue
-                categories = post_dict.categories
-                del post_dict.categories
-                post, created = models.Post.objects.get_or_create(defaults=post_dict.__dict__, feed=db_feed, link=post_dict.link)
-                if not created or post.deleted_manually:
-                    continue
-                post.save()
-                post.add_categories(categories)
                 all_posts.append(post)
             db_feed.save()
             logger.info(f"saved {len(posts)} posts for {url}")
@@ -189,6 +193,25 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job_id: str):
             error = e
             break
     return parsed_feed, all_posts, error
+
+def add_new_post(db_feed: models.Feed, job: models.Job, post_dict: h4f.PostDict):
+    # make sure that post and feed share the same domain
+    if job.should_skip_post(post_dict.link):
+        models.FulltextJob.objects.create(
+                job_id=job.id,
+                status=models.FullTextState.SKIPPED,
+                link=post_dict.link,
+        )
+        return None
+    categories = post_dict.categories
+    del post_dict.categories
+    post, created = models.Post.objects.get_or_create(defaults=post_dict.__dict__, feed=db_feed, link=post_dict.link)
+    if not created or post.deleted_manually:
+        return None
+
+    post.save()
+    post.add_categories(categories)
+    return post
         
 @shared_task(bind=True)
 def retrieve_full_text(self, ftjob_pk):

@@ -47,4 +47,6 @@ wcwidth==0.2.13
 fake-useragent==1.5.1
 whitenoise==6.7.0
 hyperlink==21.0.0
-dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2025-02-19-09-12-17/dogesec_commons-0.0.6-py3-none-any.whl
+dateparser==1.2.1
+stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/main-2025-02-04-14-14-39/stix2arango-0.0.4rc0-py3-none-any.whl
+dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2025-02-20-06-53-50/dogesec_commons-0.0.6-py3-none-any.whl
