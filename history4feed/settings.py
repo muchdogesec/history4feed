@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import UTC, datetime
 from textwrap import dedent
 
 load_dotenv()
@@ -198,6 +198,6 @@ MAXIMUM_PAGE_SIZE = int(os.getenv("MAX_PAGE_SIZE", 50))
 
 HISTORY4FEED_SETTINGS = {
     'WAYBACK_SLEEP_SECONDS': int(os.getenv("WAYBACK_SLEEP_SECONDS", 20)),
-    'EARLIEST_SEARCH_DATE': datetime.strptime(os.environ.get("EARLIEST_SEARCH_DATE", "2024-01-01T00:00:00Z"), "%Y-%m-%dT%H:%M:%SZ"),
+    'EARLIEST_SEARCH_DATE': datetime.strptime(os.environ.get("EARLIEST_SEARCH_DATE", "2024-01-01T00:00:00Z"), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC),
     'REQUEST_RETRY_COUNT': int(os.getenv("REQUEST_RETRY_COUNT", 3)),
 }

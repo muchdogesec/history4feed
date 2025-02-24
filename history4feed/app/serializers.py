@@ -18,21 +18,30 @@ class FeedSerializer(serializers.ModelSerializer):
     pretty_url = serializers.URLField(allow_null=True, required=False, help_text="This is a cosmetic URL. It is designed to show the actual blog link to browse to in a web browser (not the feed)")
     title = TitleField(required=False, max_length=256, allow_null=True, allow_blank=True)
     description = TitleField(required=False, max_length=FEED_DESCRIPTION_MAX_LENGTH, allow_null=True, allow_blank=True)
+    use_search_index = serializers.BooleanField(default=False, write_only=True, help_text="should use search index instead")
     class Meta:
         model = Feed
-        fields = '__all__'
+        # fields = '__all__'
+        exclude = ['freshness']
         read_only_fields = ['id', 'earliest_item_pubdate', 'latest_item_pubdate', 'datetime_added']
 
     def create(self, validated_data: dict):
         validated_data = validated_data.copy()
         validated_data.pop('include_remote_blogs', None)
+        validated_data.pop('use_search_index', None)
         return super().create(validated_data)
     
 class SkeletonFeedSerializer(FeedSerializer):
     include_remote_blogs = None
+    use_search_index = None
     title = serializers.CharField(required=True, help_text="title of feed")
     description = serializers.CharField(required=True, help_text="description of feed")
     feed_type = serializers.HiddenField(default=FeedType.SKELETON)
+    
+class SearchIndexFeedSerializer(FeedSerializer):
+    title = serializers.CharField(required=True, help_text="title of feed")
+    description = serializers.CharField(required=True, help_text="description of feed")
+    feed_type = serializers.HiddenField(default=FeedType.SEARCH_INDEX)
 
 
 class FeedCreatedJobSerializer(FeedSerializer):

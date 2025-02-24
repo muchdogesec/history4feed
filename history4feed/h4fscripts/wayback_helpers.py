@@ -1,6 +1,6 @@
 import json
 import time
-from datetime import datetime as dt
+from datetime import datetime as dt, UTC
 from collections import namedtuple
 from urllib.parse import urlencode
 from .h4f import FatalError, fetch_page_with_retries
@@ -12,7 +12,7 @@ DEFAULT_USER_AGENT = "curl"
 CDXSearchResult = namedtuple("CDXSearchResult", ["urlkey", "timestamp", "original_url", "mimetype", "statuscode", "digest", "length"])
 
 def cdx_search(url, earliest: dt, latest: dt=None, retry_count=3, sleep_seconds=settings.WAYBACK_SLEEP_SECONDS, user_agent="curl") -> list[CDXSearchResult]:
-    latest = latest or dt.now()
+    latest = latest or dt.now(UTC)
     query = urlencode([
         ("from", as_wayback_date(earliest)),
         ("to", as_wayback_date(latest)),
@@ -56,7 +56,7 @@ def as_wayback_date(date: dt) -> str:
     return date.strftime('%Y%m%d')
 
 def get_wayback_urls(url, from_date, to_date=None):
-    to_date = to_date or dt.now()
+    to_date = to_date or dt.now(UTC)
     urls = []
     results = cdx_search(url, from_date, to_date)
     for result in results:

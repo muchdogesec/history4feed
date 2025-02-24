@@ -20,7 +20,7 @@ from .utils import (
 from dogesec_commons.utils.serializers import CommonErrorSerializer
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from .serializers import CreatePostsSerializer, FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, PostPatchSerializer, PostWithFeedIDSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
+from .serializers import CreatePostsSerializer, FeedCreatedJobSerializer, FeedFetchSerializer, FeedPatchSerializer, PostPatchSerializer, PostWithFeedIDSerializer, SearchIndexFeedSerializer, SkeletonFeedSerializer, PatchSerializer, PostJobSerializer, PostSerializer, FeedSerializer, JobSerializer, PostCreateSerializer
 from .models import AUTO_TITLE_TRAIL, FulltextJob, JobState, Post, Feed, Job, FeedType
 from rest_framework import (
     viewsets,
@@ -312,7 +312,7 @@ class FeedView(viewsets.ModelViewSet):
     def create(self, request: request.Request, **kwargs):
 
         job_obj = self.new_create_job(request)
-        resp_data = self.serializer_class().data.copy()
+        resp_data = self.serializer_class(job_obj.feed).data.copy()
         resp_data.update(
             job_state=job_obj.state,
             job_id=job_obj.id,
@@ -320,14 +320,18 @@ class FeedView(viewsets.ModelViewSet):
         return Response(resp_data, status=status.HTTP_201_CREATED)
     
     def new_create_job(self, request: request.Request):
-        
+        feed_data = {}
         s = FeedSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-
-        try:
-            feed_data = h4f.parse_feed_from_url(s.data["url"])
-        except Exception as e:
-            raise serializers.InvalidFeed(s.data["url"])
+        if s.validated_data["use_search_index"]:
+            s = SearchIndexFeedSerializer(data=request.data)
+            s.is_valid(raise_exception=True)
+            feed_data.update(feed_type=FeedType.SEARCH_INDEX)
+        else:
+            try:
+                feed_data = h4f.parse_feed_from_url(s.data["url"])
+            except Exception as e:
+                raise serializers.InvalidFeed(s.data["url"])
 
         for k in ['title', 'description']:
             if v := s.validated_data.get(k):
