@@ -25,6 +25,7 @@ class FeedType(models.TextChoices):
     RSS = "rss"
     ATOM = "atom"
     SKELETON = "skeleton"
+    SEARCH_INDEX = "search_index"
 
 # Create your models here.
 
@@ -66,6 +67,7 @@ class Feed(models.Model):
     datetime_added = models.DateTimeField(auto_now_add=True, editable=False, help_text="date feed entry was added to database")
     feed_type = models.CharField(choices=FeedType.choices, max_length=12, null=False, editable=False, help_text="type of feed")
     pretty_url = models.URLField(max_length=1000, null=True, default=None)
+    freshness = models.DateTimeField(null=True, default=None)
 
     def get_post_count(self):
         return self.posts.filter(deleted_manually=False).count()

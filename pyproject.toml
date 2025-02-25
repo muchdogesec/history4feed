@@ -27,6 +27,7 @@ dependencies = [
     "fake-useragent>=1.5.1",
     "hyperlink",
     "django-filter>=24.2",
+    "dateparser>=1.2.1",
   ]
 [project.urls]
 Homepage = "https://github.com/muchdogesec/history4feed"
