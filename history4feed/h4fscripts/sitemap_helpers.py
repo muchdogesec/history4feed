@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import time
 from collections import namedtuple
@@ -13,7 +14,8 @@ from datetime import datetime as dt, date, timedelta
 from dateparser import parse as parse_date
 DEFAULT_USER_AGENT = "curl"
 
-
+class SearchIndexError(FatalError):
+    pass
 
 def fetch_posts_links_with_serper(site, from_time: dt, to_time: dt = None) -> dict[str, PostDict]:
     s = requests.Session()
@@ -34,9 +36,10 @@ def fetch_posts_links_with_serper(site, from_time: dt, to_time: dt = None) -> di
     while frame_start < to_time:
         frame_end = frame_start + timedelta(days=100)
         params.update(q=f"site:{site} after:{frame_start.date().isoformat()} before:{frame_end.date().isoformat()}", page=1)
-        frame_start = frame_end - timedelta(days=1)
         while True:
             resp = s.get("https://google.serper.dev/search", params=params)
+            if not resp.ok:
+                raise SearchIndexError(f"Serper Request GOT {resp.status_code}: {resp.text}")
             data = resp.json()
             credits_used += data['credits']
             for d in data['organic']:
@@ -50,5 +53,7 @@ def fetch_posts_links_with_serper(site, from_time: dt, to_time: dt = None) -> di
             params['page'] += 1
             if len(data['organic']) < params['num']:
                 break
+        frame_start = frame_end - timedelta(days=1)
+    logging.info(f"got {len(entries)} posts between {from_time} and {to_time}, used {credits_used} credits")
     return entries
 

@@ -45,7 +45,7 @@ def new_job(feed: models.Feed, include_remote_blogs):
         if not queue_lock(feed, job_obj):
             raise Throttled(detail={"message": "A job is already running for this feed", **cache.get(get_lock_id(feed))})
 
-        (start_job.s(job_obj.pk)| retrieve_posts_from_links.s(job_obj.pk) | wait_for_all_with_retry.s() | collect_and_schedule_removal.si(job_obj.pk)).apply_async(countdown=5)
+        (start_job.s(job_obj.pk)| retrieve_posts_from_links.s(job_obj.pk) | wait_for_all_with_retry.s() | collect_and_schedule_removal.si(job_obj.pk)).apply_async(countdown=5, link_error=error_handler.s(job_obj.pk))
         return job_obj
 
 def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_remote_blogs=True):
@@ -60,7 +60,7 @@ def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_rem
         link=post.link,
     ) for post in posts]
     chain = celery.chain([retrieve_full_text.si(ft_job.pk) for ft_job in ft_jobs])
-    ( start_post_job.si(job_obj.id) | chain | collect_and_schedule_removal.si(job_obj.pk)).apply_async()
+    ( start_post_job.si(job_obj.id) | chain | collect_and_schedule_removal.si(job_obj.pk)).apply_async(link_error=error_handler.s(job_obj.pk))
     return job_obj
 
 @shared_task(bind=True, default_retry_delay=10)
@@ -109,7 +109,6 @@ def retrieve_posts_from_links(urls, job_id):
     for index, url in enumerate(urls):
         error = None
         if feed.feed_type == models.FeedType.SEARCH_INDEX:
-            print(job.run_datetime, settings.EARLIEST_SEARCH_DATE, feed.freshness)
             start_time = feed.freshness or settings.EARLIEST_SEARCH_DATE
             if not start_time.tzinfo:
                 start_time = start_time.replace(tzinfo=UTC)
@@ -149,13 +148,16 @@ def retrieve_posts_from_links(urls, job_id):
 def collect_and_schedule_removal(sender, job_id):
     logger.print(f"===> {sender=}, {job_id=} ")
     job = models.Job.objects.get(pk=job_id)
+    remove_lock(job)
+    if job.state == models.JobState.RUNNING:
+        job.state = models.JobState.SUCCESS
+        job.save()
+
+def remove_lock(job):
     if cache.delete(get_lock_id(job.feed)):
         logger.debug("lock deleted")
     else:
         logger.debug("Failed to remove lock")
-    if job.state == models.JobState.RUNNING:
-        job.state = models.JobState.SUCCESS
-        job.save()
 
 def retrieve_posts_from_url(url, db_feed: models.Feed, job: models.Job):
     back_off_seconds = settings.WAYBACK_SLEEP_SECONDS
@@ -233,4 +235,14 @@ def retrieve_full_text(self, ftjob_pk):
 from celery import signals
 @signals.worker_ready.connect
 def mark_old_jobs_as_failed(**kwargs):
-    models.Job.objects.filter(state=models.JobState.PENDING).update(state=models.JobState.FAILED, info="marked as failed on startup")
+    models.Job.objects.filter(state__in=[models.JobState.PENDING, models.JobState.RUNNING]).update(state=models.JobState.FAILED, info="marked as failed on startup")
+
+@shared_task
+def error_handler(request, exc: Exception, traceback, job_id):
+    job = models.Job.objects.get(pk=job_id)
+    job.state = models.JobState.FAILED
+    job.info = f"job failed: {exc}"
+    job.save()
+    remove_lock(job)
+    logger.error('Job {3} with task_id {0} raised exception: {1!r}\n{2!r}'.format(
+          request.id, exc, traceback, job_id))
