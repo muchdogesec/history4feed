@@ -553,9 +553,10 @@ class feed_post_view(
 
     class filterset_class(PostOnlyView.filterset_class):
         feed_id = None
-
-    def get_queryset(self):
-        return Post.visible_posts().filter(feed_id=self.kwargs.get("feed_id"))
+    
+    def filter_queryset(self, queryset):
+        queryset = queryset.filter(feed_id=self.kwargs.get("feed_id"))
+        return super().filter_queryset(queryset)
 
     @extend_schema(
         parameters=[FEED_ID_PARAM],
