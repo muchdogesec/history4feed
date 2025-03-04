@@ -1,42 +1,89 @@
-name: schemathesis tests
+name: Schemathesis Test
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
 
 jobs:
   test-schema-thesis:
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Get current date and create env file
-        id: date
-        run: echo "::set-output name=date::$(date -u -d 'yesterday' +'%Y-%m-%dT00:00:00Z')"
-    
-      - name: Set .env for docker-compose
-        run: |
-            echo 'CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP=1' >> .env
-            echo 'POSTGRES_HOST=pgdb' >> .env
-            echo 'POSTGRES_DB=postgres' >> .env
-            echo 'POSTGRES_USER=postgres' >> .env
-            echo 'POSTGRES_PASSWORD=postgres' >> .env
-            echo 'EARLIEST_SEARCH_DATE=${{ steps.date.outputs.date }}' >> .env
-         
-      - name: Start docker-compose H4F
-        uses: hoverkraft-tech/compose-action@v2.0.2
-    
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+    
+          
+      - name: Set .env for docker-compose
+        run: |
+            echo "EARLIEST_SEARCH_DATE=$(date -u -d yesterday +'%Y-%m-%dT%H:%M:%SZ')" >> .env
+            echo "SCRAPFLY_APIKEY=${{secrets.SCRAPFLY_APIKEY}}" >> .env
+
+
+            cat tests/st/.env.schemathesis >> .env
+            cp tests/st/docker-compose.yml arango-compose.yml
+
+            echo ==== env file start =====
+            cat .env
+            echo
+            echo ==== env file end   =====
+
+         
+      - name: Start docker-compose
+        uses: hoverkraft-tech/compose-action@v2.0.2
+        with:
+          compose-file: |
+            arango-compose.yml
+            docker-compose.yml
+          compose-flags:
+            --env-file .env
+            -p h4f-action
+            
+
+      - name: sleep
+        run: echo "waiting 30 seconds for ctibutler to start" && sleep 30
+
+      - name: Get IP addresses
+        id: get_ip
+        run: |
+              IP_ADDRESS=$(docker network inspect -f '{{range.IPAM.Config}}{{.Gateway}}{{end}}' h4f-action_default)
+              echo "ip_address=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
+              echo "IP_ADDRESS=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
+              echo "SERVICE_BASE_URL=http://$IP_ADDRESS:8002/" >> "$GITHUB_OUTPUT"
+              cat "$GITHUB_OUTPUT"
+
+    
+
+      - name: test all endpoints 1
+        id: test-endpoints
+        run: |
+          pip install -r tests/requirements.txt
+          export SERVICE_BASE_URL="${{ steps.get_ip.outputs.SERVICE_BASE_URL }}"
+
+          pytest tests/
 
       - name: run schemathesis
         uses: schemathesis/action@v1
+        env:
+          SCHEMATHESIS_HOOKS: tests.st.hooks
         with:
-          schema: 'http://127.0.0.1:8001/api/schema'
+          schema: ${{ steps.get_ip.outputs.SERVICE_BASE_URL }}/api/schema/
           checks: all
           wait-for-schema: '30'
           args: '--generation-allow-x00 false'
+
+      - name: test delete all
+        id: test-endpoints-2
+        run: |
+            pip install -r tests/requirements.txt
+            export DELETE_ALL_FEEDS=true
+            export SERVICE_BASE_URL="${{ steps.get_ip.outputs.SERVICE_BASE_URL }}"
+            pytest tests/test_99_delete_all_feeds.py

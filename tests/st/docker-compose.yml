@@ -1,0 +1,19 @@
+
+services:
+      arangodb:
+        image: arangodb/arangodb
+        volumes:
+            - arangodb_data:/var/lib/arangodb3
+        environment:
+          ARANGO_ROOT_PASSWORD: ${ARANGODB_PASSWORD}
+        ports:
+          - "8529:8529"
+        healthcheck:
+            test: ["CMD-SHELL", 'curl -u "$ARANGODB_USERNAME:$ARANGODB_PASSWORD" localhost:8529/_api ']
+            interval: 10s
+            retries: 5
+            start_period: 10s
+            timeout: 10s
+
+volumes:
+  arangodb_data:
