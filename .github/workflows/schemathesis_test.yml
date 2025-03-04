@@ -49,7 +49,7 @@ jobs:
             
 
       - name: sleep
-        run: echo "waiting 30 seconds for ctibutler to start" && sleep 30
+        run: echo "waiting 30 seconds for h4f-action to start" && sleep 30
 
       - name: Get IP addresses
         id: get_ip
