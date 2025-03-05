@@ -11,6 +11,7 @@ from .openapi_params import (
     XML_RESPONSE,
 )
 from .utils import (
+    DatetimeFilter,
     Ordering,
     Pagination,
     MinMaxDateFilter,
@@ -56,6 +57,8 @@ from datetime import datetime
 import textwrap
 
 from history4feed.app import serializers
+
+from history4feed.app import utils
 
 
 class Response(response.Response):
@@ -196,7 +199,7 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
         )
         job_id = Filter(help_text="Filter the Post by Job ID the Post was downloaded in.", field_name="fulltext_jobs__job_id")
         job_state = filters.ChoiceFilter(choices=JobState.choices, help_text="Filter by job status")
-        updated_after = Filter(help_text="Only show posts updated after date/time. It must be in YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]", field_name="datetime_updated", lookup_expr="gt")
+        updated_after = DatetimeFilter(help_text="Only show posts updated after date/time. It must be in YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]", field_name="datetime_updated", lookup_expr="gt")
 
     def get_queryset(self):
         return Post.visible_posts() \
@@ -500,10 +503,10 @@ class FeedView(viewsets.ModelViewSet):
             """
         ),
         responses={
-            200: {},
+            204: {},
             404: OpenApiResponse(
                 CommonErrorSerializer,
-                "Not found",
+                "Feed does not exist",
                 examples=[HTTP404_EXAMPLE],
             ),
         },
