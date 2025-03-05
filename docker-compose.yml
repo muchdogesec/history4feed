@@ -15,7 +15,6 @@ services:
             - 8002:8002
         environment:
             - DEBUG=1
-            - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1] django
             - CELERY_BROKER_URL=redis://redis:6379/0
         env_file:
             - ./.env
@@ -35,7 +34,6 @@ services:
             - .:/usr/src/app
         environment:
             - DEBUG=1
-            - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
             - CELERY_BROKER_URL=redis://redis:6379/0
             - result_backend=redis://redis:6379/1
         env_file:
