@@ -29,7 +29,6 @@ jobs:
 
 
             cat tests/st/.env.schemathesis >> .env
-            cp tests/st/docker-compose.yml arango-compose.yml
 
             echo ==== env file start =====
             cat .env
@@ -41,7 +40,6 @@ jobs:
         uses: hoverkraft-tech/compose-action@v2.0.2
         with:
           compose-file: |
-            arango-compose.yml
             docker-compose.yml
           compose-flags:
             --env-file .env

@@ -31,9 +31,6 @@ class MinMaxDateFilter(BaseFilterBackend):
         return out
     
     def parse_date(self, value):
-        print(value, 3)
-        print(value, 2)
-        print(value, 1)
         return DatetimeFieldUTC().to_python(value)
 
     def filter_queryset(self, request, queryset, view):
