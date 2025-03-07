@@ -60,7 +60,7 @@ def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_rem
         link=post.link,
     ) for post in posts]
     chain = celery.chain([retrieve_full_text.si(ft_job.pk) for ft_job in ft_jobs])
-    ( start_post_job.si(job_obj.id) | chain | collect_and_schedule_removal.si(job_obj.pk)).apply_async(link_error=error_handler.s(job_obj.pk))
+    ( start_post_job.si(job_obj.id) | chain | collect_and_schedule_removal.si(job_obj.pk)).apply_async(link_error=error_handler.s(job_obj.pk), countdown=5)
     return job_obj
 
 @shared_task(bind=True, default_retry_delay=10)
