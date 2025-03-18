@@ -686,7 +686,7 @@ class JobView(
     pagination_class = Pagination("jobs")
     filter_backends = [DjangoFilterBackend, Ordering]
     ordering_fields = ["run_datetime", "state"]
-    ordering = ["-run_datetime"]
+    ordering = "run_datetime_descending"
     openapi_tags = ["Jobs"]
     lookup_url_kwarg = "job_id"
     lookup_field = "id"
