@@ -557,9 +557,9 @@ class feed_post_view(
     class filterset_class(PostOnlyView.filterset_class):
         feed_id = None
     
-    def filter_queryset(self, queryset):
-        queryset = queryset.filter(feed_id=self.kwargs.get("feed_id"))
-        return super().filter_queryset(queryset)
+    
+    def get_queryset(self):
+        return PostOnlyView.get_queryset(self).filter(feed_id=self.kwargs.get("feed_id"))
 
     @extend_schema(
         parameters=[FEED_ID_PARAM],
@@ -674,7 +674,6 @@ class feed_post_view(
 
 
 class FeedPostView(
-    PostOnlyView,
     feed_post_view
 ):
     pass
