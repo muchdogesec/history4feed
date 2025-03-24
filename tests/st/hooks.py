@@ -26,12 +26,6 @@ def after_load_schema(
 
     for method in ['GET', 'PATCH', 'DELETE']:
         schema.add_link(
-            source=schema['/api/v1/feeds/{feed_id}/posts/']['GET'],
-            target=schema['/api/v1/feeds/{feed_id}/posts/{post_id}/'][method],
-            status_code=200,
-            parameters={"path.post_id": "$response.body#/posts/0/id", "path.feed_id": "$request.path.feed_id"}
-        )
-        schema.add_link(
             source=schema['/api/v1/posts/']['GET'],
             target=schema['/api/v1/posts/{post_id}/'][method],
             status_code=200,

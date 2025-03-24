@@ -83,7 +83,7 @@ jobs:
           schema: ${{ steps.get_ip.outputs.SERVICE_BASE_URL }}/api/schema/
           checks: all
           wait-for-schema: '30'
-          args: '--generation-allow-x00 false'
+          args: '--generation-allow-x00 false --show-trace'
 
       - name: test delete all
         id: test-endpoints-2
