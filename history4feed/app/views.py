@@ -513,6 +513,43 @@ class FeedView(viewsets.ModelViewSet):
     )
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
+    
+class RSSView(viewsets.GenericViewSet):
+    class filterset_class(PostOnlyView.filterset_class):
+        feed_id = None
+    openapi_tags = ["Feeds"]
+    renderer_classes=[RSSRenderer]
+    lookup_url_kwarg = 'feed_id'
+
+    @extend_schema(
+        parameters=[FEED_ID_PARAM],
+        filters=True,
+        summary="Search for Posts in a Feed (RSS)",
+        description=textwrap.dedent(
+            """
+            Use this endpoint with your feed reader. The response of this endpoint is valid RSS XML for the Posts in the Feed. If you want more flexibility (perhaps to build a custom integration) use the JSON version of this endpoint.
+            """
+        ),
+        responses={
+            (200, RSSRenderer.media_type): XML_RESPONSE,
+            (404, "application/json"): OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
+            (400, "application/json"): OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
+        },
+    )
+    @decorators.action(
+        methods=["get"],
+        detail=True,
+        pagination_class=XMLPostPagination("xml_posts"),
+    )
+    def rss(self, request: request.Request, *args, feed_id=None, **kwargs):
+        feed_obj = get_object_or_404(Feed, id=feed_id)
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        body = build_rss.build_rss(feed_obj, page)
+        return self.paginator.get_paginated_response(body)
+    
+    def get_queryset(self):
+        return PostOnlyView.get_queryset(self).filter(feed_id=self.kwargs.get("feed_id"))
 
 
 
@@ -560,34 +597,6 @@ class feed_post_view(
     
     def get_queryset(self):
         return PostOnlyView.get_queryset(self).filter(feed_id=self.kwargs.get("feed_id"))
-
-    @extend_schema(
-        parameters=[FEED_ID_PARAM],
-        filters=True,
-        summary="Search for Posts in a Feed (RSS)",
-        description=textwrap.dedent(
-            """
-            Use this endpoint with your feed reader. The response of this endpoint is valid RSS XML for the Posts in the Feed. If you want more flexibility (perhaps to build a custom integration) use the JSON version of this endpoint.
-            """
-        ),
-        responses={
-            (200, RSSRenderer.media_type): XML_RESPONSE,
-            (404, "application/json"): OpenApiResponse(CommonErrorSerializer, "Feed not found", examples=[HTTP404_EXAMPLE]),
-            (400, "application/json"): OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
-        },
-    )
-    @decorators.action(
-        methods=["get"],
-        detail=False,
-        pagination_class=XMLPostPagination("xml_posts"),
-        renderer_classes=[RSSRenderer, renderers.JSONRenderer],
-    )
-    def xml(self, request: request.Request, *args, feed_id=None, **kwargs):
-        feed_obj = get_object_or_404(Feed, id=feed_id)
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        body = build_rss.build_rss(feed_obj, page)
-        return self.paginator.get_paginated_response(body)
     
     
     @extend_schema(
