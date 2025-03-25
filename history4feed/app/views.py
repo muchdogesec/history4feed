@@ -524,7 +524,7 @@ class RSSView(viewsets.GenericViewSet):
     @extend_schema(
         parameters=[FEED_ID_PARAM],
         filters=True,
-        summary="Search for Posts in a Feed (RSS)",
+        summary="RSS Feed for Feed",
         description=textwrap.dedent(
             """
             Use this endpoint with your feed reader. The response of this endpoint is valid RSS XML for the Posts in the Feed. If you want more flexibility (perhaps to build a custom integration) use the JSON version of this endpoint.
