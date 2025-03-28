@@ -371,7 +371,7 @@ class FeedView(viewsets.ModelViewSet):
             """
         ),
         responses={
-            201: SkeletonFeedSerializer,
+            201: FeedSerializer,
             400: OpenApiResponse(CommonErrorSerializer, "Bad request", examples=[HTTP400_EXAMPLE]),
         },
         request=SkeletonFeedSerializer,

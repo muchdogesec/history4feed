@@ -35,7 +35,7 @@ class SkeletonFeedSerializer(FeedSerializer):
     include_remote_blogs = None
     use_search_index = None
     title = serializers.CharField(required=True, help_text="title of feed")
-    description = serializers.CharField(required=True, help_text="description of feed")
+    description = serializers.CharField(required=False, help_text="description of feed", allow_blank=True)
     feed_type = serializers.HiddenField(default=FeedType.SKELETON)
     
 class SearchIndexFeedSerializer(FeedSerializer):
