@@ -181,6 +181,7 @@ class ErrorResp(Response):
         ),
         responses={
             201: PostSerializer,
+            400: OpenApiResponse(CommonErrorSerializer, "Request not understood", examples=[HTTP400_EXAMPLE]),
             404: OpenApiResponse(CommonErrorSerializer, "post does not exist", examples=[HTTP404_EXAMPLE]),
         },
         request=PostPatchSerializer,
