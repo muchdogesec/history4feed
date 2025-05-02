@@ -68,6 +68,7 @@ def start_post_job(self: CeleryTask, job_id):
     job = models.Job.objects.get(pk=job_id)
     if job.is_cancelled():
         job.info = "job cancelled while in queue"
+        job.save()
         return False
     if not queue_lock(job.feed, job):
         return self.retry(max_retries=360)
