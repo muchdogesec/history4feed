@@ -66,6 +66,10 @@ def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_rem
 @shared_task(bind=True, default_retry_delay=10)
 def start_post_job(self: CeleryTask, job_id):
     job = models.Job.objects.get(pk=job_id)
+    if job.is_cancelled():
+        job.info = "job cancelled while in queue"
+        job.save()
+        return False
     if not queue_lock(job.feed, job):
         return self.retry(max_retries=360)
     job.state = models.JobState.RUNNING
@@ -107,6 +111,8 @@ def retrieve_posts_from_links(urls, job_id):
     parsed_feed = {}
     job = models.Job.objects.get(id=job_id)
     for index, url in enumerate(urls):
+        if job.is_cancelled():
+            break
         error = None
         if feed.feed_type == models.FeedType.SEARCH_INDEX:
             start_time = feed.freshness or settings.EARLIEST_SEARCH_DATE
@@ -143,6 +149,8 @@ def retrieve_posts_from_links(urls, job_id):
     logger.info("====\n"*5)
     return [result.id for result in chains]
 
+class JobCancelled(Exception):
+    pass
 
 @shared_task(bind=True)
 def collect_and_schedule_removal(sender, job_id):
@@ -168,6 +176,8 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job: models.Job):
         if i != 0:
             time.sleep(back_off_seconds)
         try:
+            if job.is_cancelled():
+                raise JobCancelled("job was terminated by user")
             data, content_type, url = h4f.fetch_page_with_retries(url)
             parsed_feed = h4f.parse_feed_from_content(data, url)
             if parsed_feed['feed_type'] == models.FeedType.ATOM:
@@ -219,10 +229,16 @@ def add_new_post(db_feed: models.Feed, job: models.Job, post_dict: h4f.PostDict)
 def retrieve_full_text(self, ftjob_pk):
     fulltext_job = models.FulltextJob.objects.get(pk=ftjob_pk)
     try:
-        fulltext_job.post.description, fulltext_job.post.content_type = h4f.get_full_text(fulltext_job.post.link)
-        fulltext_job.status = models.FullTextState.RETRIEVED
-        fulltext_job.error_str = ""
-        fulltext_job.post.is_full_text = True
+        if fulltext_job.is_cancelled():
+            raise JobCancelled()
+        else:
+            fulltext_job.post.description, fulltext_job.post.content_type = h4f.get_full_text(fulltext_job.post.link)
+            fulltext_job.status = models.FullTextState.RETRIEVED
+            fulltext_job.error_str = ""
+            fulltext_job.post.is_full_text = True
+    except JobCancelled:
+        fulltext_job.status = models.FullTextState.CANCELLED
+        fulltext_job.error_str = "job cancelled while retrieving fulltext"
     except BaseException as e:
         fulltext_job.error_str = str(e)
         fulltext_job.status = models.FullTextState.FAILED
@@ -235,7 +251,7 @@ def retrieve_full_text(self, ftjob_pk):
 from celery import signals
 @signals.worker_ready.connect
 def mark_old_jobs_as_failed(**kwargs):
-    models.Job.objects.filter(state__in=[models.JobState.PENDING, models.JobState.RUNNING]).update(state=models.JobState.FAILED, info="marked as failed on startup")
+    models.Job.objects.filter(state__in=[models.JobState.PENDING, models.JobState.RUNNING]).update(state=models.JobState.CANCELLED, info="job cancelled automatically on server startup")
 
 @shared_task
 def error_handler(request, exc: Exception, traceback, job_id):

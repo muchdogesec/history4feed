@@ -166,6 +166,7 @@ class JobUrlStatusSerializer(serializers.Serializer):
     retrieving = joburlstatus(many=True, default=[])
     skipped = joburlstatus(many=True, default=[])
     failed = joburlstatus(many=True, default=[])
+    cancelled = joburlstatus(many=True, default=[])
 
 class JobSerializer(serializers.ModelSerializer):
     count_of_items = serializers.IntegerField(read_only=True)

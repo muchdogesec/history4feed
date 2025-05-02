@@ -765,3 +765,27 @@ class JobView(
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
+    
+
+    @extend_schema(
+        parameters=[JOB_ID_PARAM],
+        summary="Kill a running Job",
+        description=textwrap.dedent(
+            """
+            Using a Job ID you can kill it.
+            """
+        ),
+        responses={
+            204: {},
+            404: OpenApiResponse(
+                CommonErrorSerializer,
+                "Job not found",
+                [HTTP404_EXAMPLE],
+            ),
+        },
+    )
+    @decorators.action(methods=['DELETE'], detail=True, url_path="kill")
+    def cancel_job(self, request, *args, **kwargs):
+        obj: Job = self.get_object()
+        obj.cancel()
+        return Response(status=status.HTTP_204_NO_CONTENT)
