@@ -23,7 +23,7 @@ class FeedSerializer(serializers.ModelSerializer):
         model = Feed
         # fields = '__all__'
         exclude = ['freshness']
-        read_only_fields = ['id', 'earliest_item_pubdate', 'latest_item_pubdate', 'datetime_added']
+        read_only_fields = ['id', 'earliest_item_pubdate', 'latest_item_pubdate', 'datetime_added', "datetime_modified"]
 
     def create(self, validated_data: dict):
         validated_data = validated_data.copy()

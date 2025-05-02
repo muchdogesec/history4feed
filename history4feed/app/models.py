@@ -11,6 +11,7 @@ import hyperlink
 from django.db.models import Min, Max
 from django.db.models import OuterRef, Subquery
 from django.db.models import F
+from django.utils import timezone
 
 POST_DESCRIPTION_MAX_LENGTH = 2 * 1024 * 1024 # 2MiB
 FEED_DESCRIPTION_MAX_LENGTH = 10*1024 # 10KiB
@@ -66,6 +67,7 @@ class Feed(models.Model):
     earliest_item_pubdate = models.DateTimeField(null=True, help_text="pubdate of earliest post")
     latest_item_pubdate = models.DateTimeField(null=True, help_text="pubdate of latest post")
     datetime_added = models.DateTimeField(auto_now_add=True, editable=False, help_text="date feed entry was added to database")
+    datetime_modified = models.DateTimeField(default=None, null=True, help_text="date feed entry was edited in the database")
     feed_type = models.CharField(choices=FeedType.choices, max_length=12, null=False, editable=False, help_text="type of feed")
     pretty_url = models.URLField(max_length=1000, null=True, default=None)
     freshness = models.DateTimeField(null=True, default=None)
@@ -77,6 +79,7 @@ class Feed(models.Model):
         if not self.id:
             self.id = stix_id(self.url)
         self.earliest_item_pubdate, self.latest_item_pubdate = self.posts.aggregate(min=Min('pubdate'), max=Max('pubdate')).values()
+        self.datetime_modified = self.datetime_modified or self.datetime_added
         return super().save(*args, **kwargs)
     
     def get_pretty_url(self):
