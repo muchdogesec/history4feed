@@ -16,10 +16,11 @@ POST_DESCRIPTION_MAX_LENGTH = 2 * 1024 * 1024 # 2MiB
 FEED_DESCRIPTION_MAX_LENGTH = 10*1024 # 10KiB
 
 class JobState(models.TextChoices):
-    PENDING = "pending"
-    RUNNING = "running"
-    SUCCESS = "success"
-    FAILED  = "failed"
+    PENDING    = "pending"
+    RUNNING    = "running"
+    SUCCESS    = "success"
+    CANCELLED  = "cancelled"
+    FAILED     = "failed"
 
 class FeedType(models.TextChoices):
     RSS = "rss"
@@ -109,11 +110,21 @@ class Job(models.Model):
     
     def should_skip_post(self, post_link: str):
         return (not self.include_remote_blogs) and urlparse(self.feed.url).hostname.split('.')[-2:] != urlparse(post_link).hostname.split('.')[-2:]
+    
+    def cancel(self):
+        if self.state in [JobState.PENDING, JobState.RUNNING]:
+            self.state = JobState.CANCELLED
+        self.save()
+        return
+    
+    def is_cancelled(self):
+        return self.state == JobState.CANCELLED
 
 
 class FullTextState(models.TextChoices):
     RETRIEVED  = "retrieved"
     SKIPPED    = "skipped"
+    CANCELLED  = "cancelled"
     FAILED     = "failed"
     RETRIEVING = "retrieving"
 
@@ -166,3 +177,8 @@ class FulltextJob(models.Model):
     status = models.CharField(max_length=15, choices=FullTextState.choices, default=FullTextState.RETRIEVING)
     error_str = models.CharField(max_length=1500, null=True, blank=True)
     link = models.CharField(max_length=1500)
+
+
+        
+    def is_cancelled(self):
+        return self.job.state == JobState.CANCELLED
