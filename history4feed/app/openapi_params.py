@@ -7,19 +7,19 @@ from .serializers import PostSerializer
 FEED_ID_PARAM = OpenApiParameter(
     "feed_id",
     type=OpenApiTypes.UUID,
-    description="The ID of the Feed. You can search for Feed IDs using the GET Feeds endpoints.",
+    description="The ID of the Feed. You can search for Feed IDs using the GET Feeds endpoints. e.g. `6c6e6448-04d4-42a3-9214-4f0f7d02694e`",
     location=OpenApiParameter.PATH,
 )
 JOB_ID_PARAM = OpenApiParameter(
     "job_id",
     type=OpenApiTypes.UUID,
-    description="The ID of the Job. You can search for Job IDs using the GET Jobs endpoints.",
+    description="The ID of the Job. You can search for Job IDs using the GET Jobs endpoints. e.g. `7db25a55-55e4-4bc5-b189-3e2ca4e304e5`",
     location=OpenApiParameter.PATH,
 )
 POST_ID_PARAM = OpenApiParameter(
     "post_id",
     type=OpenApiTypes.UUID,
-    description="The ID of the Post. You can search for Post IDs using the GET Posts endpoints for a specific Feed.",
+    description="The ID of the Post. You can search for Post IDs using the GET Posts endpoints for a specific Feed. e.g. `797e94b1-efdc-4e66-a748-f2b6a5896a89`",
     location=OpenApiParameter.PATH,
 )
 
