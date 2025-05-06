@@ -200,7 +200,7 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
     minmax_date_fields = ["pubdate"]
 
     class filterset_class(FilterSet):
-        feed_id = filters.BaseInFilter(help_text="filter by one or more `feed_id`(s)")
+        feed_id = filters.BaseInFilter(help_text="Filter the results by one or more `feed_id`(s). e.g. `3f388179-4683-4495-889f-690c5de3ae7c`")
         title = Filter(
             help_text="Filter the content by the `title` of the post. Will search for titles that contain the value entered. Search is wildcard so `exploit` will match `exploited` and `exploits`.",
             lookup_expr="icontains",
@@ -213,9 +213,9 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
             help_text="Filter the content by a posts `link`. Will search for links that contain the value entered. Search is wildcard so `dogesec` will return any URL that contains the string `dogesec`.",
             lookup_expr="icontains",
         )
-        job_id = Filter(help_text="Filter the Post by Job ID the Post was downloaded in.", field_name="fulltext_jobs__job_id")
+        job_id = Filter(help_text="Filter the results by the Job ID the Post was downloaded or updated in. e.g. `6606bd0c-9d9d-4ffd-81bb-81c9196ccfe6`", field_name="fulltext_jobs__job_id")
         job_state = filters.ChoiceFilter(choices=JobState.choices, help_text="Filter by job status")
-        updated_after = DatetimeFilter(help_text="Only show posts updated after date/time. It must be in YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]", field_name="datetime_updated", lookup_expr="gt")
+        updated_after = DatetimeFilter(help_text="Only show posts with a `datetime_updated` after the time specified. It must be in `YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]`, e.g. `2020-01-01 00:00`", field_name="datetime_updated", lookup_expr="gt")
 
     def get_queryset(self):
         return Post.visible_posts() \
@@ -280,15 +280,15 @@ class FeedView(viewsets.ModelViewSet):
 
     class filterset_class(FilterSet):
         title = Filter(
-            help_text="Filter by the content in feed title. Will search for titles that contain the value entered.",
+            help_text="Filter by the content in feed title. Will search for titles that contain the value entered. Search is wildcard so `exploit` will match `exploited` and `exploits`.",
             lookup_expr="icontains",
         )
         description = Filter(
-            help_text="Filter by the content in feed description. Will search for descriptions that contain the value entered.",
+            help_text="Filter by the content in feed description. Will search for descriptions that contain the value entered. Search is wildcard so `exploit` will match `exploited` and `exploits`.",
             lookup_expr="icontains",
         )
         url = Filter(
-            help_text="Filter by the content in a feeds URL. Will search for URLs that contain the value entered.",
+            help_text="Filter by the content in a feeds URL. Will search for URLs that contain the value entered. Search is wildcard so `google` will match `google.com` and `google.co.uk`.",
             lookup_expr="icontains",
         )
         id = BaseCSVFilter(
@@ -418,6 +418,8 @@ class FeedView(viewsets.ModelViewSet):
             Only one/key value is required in the request. For those not passed, the current value will remain unchanged.
 
             The response will contain the newly updated Feed object.
+
+            Every time the feed is updated, the `datetime_modified` property in the Feed object will be updated accordingly.
             """
         ),
         responses={
@@ -717,10 +719,10 @@ class JobView(
 
     class filterset_class(FilterSet):
         feed_id = Filter(
-            help_text="Filter Jobs by the ID of the Feed they belong to. You can search for Feed IDs using the GET Feeds endpoints. Note a Feed can have multiple jobs associated with it where a PATCH request has been run to update the Feed."
+            help_text="Filter Jobs by the ID of the Feed they belong to. You can search for Feed IDs using the GET Feeds endpoints. Note a Feed can have multiple jobs associated with it where a PATCH request has been run to update the Feed. e.g. `6c6e6448-04d4-42a3-9214-4f0f7d02694e`"
         )
         state = Filter(help_text="Filter by the status of a Job")
-        post_id = UUIDFilter(help_text="Filter Jobs by the ID of the Post they belong to. You can search for Post IDs using the GET Posts endpoint. Note a Post can have multiple jobs associated with it where a PATCH request has been run to update a Feed or a Post.", field_name="fulltext_jobs__post_id")
+        post_id = UUIDFilter(help_text="Filter Jobs by the ID of the Post they belong to. You can search for Post IDs using the GET Posts endpoint. Note a Post can have multiple jobs associated with it where a PATCH request has been run to update a Feed or a Post. e.g `797e94b1-efdc-4e66-a748-f2b6a5896a89`", field_name="fulltext_jobs__post_id")
 
     def get_queryset(self):
         return Job.objects.all().annotate(count_of_items=Count("fulltext_jobs"))
