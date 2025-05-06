@@ -773,7 +773,11 @@ class JobView(
         summary="Kill a running Job",
         description=textwrap.dedent(
             """
-            Using a Job ID you can kill it.
+            Using a Job ID you can kill it whilst it is still in `running` or `pending` state.
+
+            If any posts have already been downloaded before the job is complete, they will still remain and you will need to delete them using the delete endpoints manually.
+
+            The job will enter `cancelled` state when cancelled.
             """
         ),
         responses={
