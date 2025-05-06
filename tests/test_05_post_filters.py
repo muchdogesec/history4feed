@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import unittest, pytest
 from urllib.parse import urljoin
 
-from tests.utils import get_post_ids_for_job, remove_unknown_keys, wait_for_jobs
+from tests.utils import get_post_ids_for_job, is_sorted, remove_unknown_keys, wait_for_jobs
 
 base_url = os.environ["SERVICE_BASE_URL"]
 import requests
@@ -164,3 +164,31 @@ def test_job_filter(subtests):
     for job in jobs_resp.json()['jobs']:
         with subtests.test("test_job_id_filter", job_id=job['id']):
             test_job_id_filter(job['id'], [x[0] for x in get_post_ids_for_job(job)])
+
+
+@pytest.mark.parametrize(
+        ["sort_filter", "expected_sort"],
+        [
+        ("", "pubdate_descending"), #default filter
+        ("pubdate_descending", "pubdate_descending"),
+        ("pubdate_ascending", "pubdate_ascending"),
+        ("title_descending", "title_descending"),
+        ("title_ascending", "title_ascending"),
+        ("datetime_updated_descending", "datetime_updated_descending"),
+        ("datetime_updated_ascending", "datetime_updated_ascending"),
+        ("datetime_added_descending", "datetime_added_descending"),
+        ("datetime_added_ascending", "datetime_added_ascending"),
+    ]
+)
+def test_list_posts_sort(sort_filter: str, expected_sort: str):
+    reports_url = urljoin(base_url, f"api/v1/posts/")
+    filters = dict(sort=sort_filter) if sort_filter else None
+    get_resp = requests.get(reports_url, params=filters)
+    assert get_resp.status_code == 200, f"response: {get_resp.text}"
+    posts = get_resp.json()["posts"]
+    property, _, direction = expected_sort.rpartition('_')
+    def sort_fn(obj):
+        retval = obj[property]
+        print(retval)
+        return retval
+    assert is_sorted(posts, key=sort_fn, reverse=direction == 'descending'), f"expected posts to be sorted by {property} in {direction} order"

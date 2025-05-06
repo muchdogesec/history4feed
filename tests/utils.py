@@ -1,3 +1,5 @@
+from itertools import tee
+from operator import lt
 import os
 import time
 from types import SimpleNamespace
@@ -39,3 +41,11 @@ def get_post_ids_for_job(job:dict):
             retval.append((p['id'], type))
     return retval
     
+
+def is_sorted(iterable, key=None, reverse=False):
+    it = iterable if (key is None) else map(key, iterable)
+    a, b = tee(it)
+    next(b, None)
+    if reverse:
+        b, a = a, b
+    return not any(map(lt, b, a))
