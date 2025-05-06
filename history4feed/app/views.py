@@ -55,6 +55,7 @@ from django_filters.rest_framework import (
 from django.db.models import Count, Q, Subquery, OuterRef
 from datetime import datetime
 import textwrap
+from django.utils import timezone
 
 from history4feed.app import serializers
 
@@ -429,7 +430,7 @@ class FeedView(viewsets.ModelViewSet):
         feed_obj: Feed = self.get_object()
         s = FeedPatchSerializer(feed_obj, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
-        s.save()
+        s.save(datetime_modified=timezone.now())
         return Response(self.serializer_class(feed_obj).data, status=status.HTTP_201_CREATED)
     
     @extend_schema(
