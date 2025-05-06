@@ -772,7 +772,7 @@ class JobView(
 
     @extend_schema(
         parameters=[JOB_ID_PARAM],
-        summary="Kill a running Job",
+        summary="Kill a running Job that is indexing Posts",
         description=textwrap.dedent(
             """
             Using a Job ID you can kill it whilst it is still in `running` or `pending` state.
