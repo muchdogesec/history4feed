@@ -196,7 +196,7 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
     pagination_class = Pagination("posts")
     filter_backends = [DjangoFilterBackend, Ordering, MinMaxDateFilter]
     ordering_fields = ["pubdate", "title", "datetime_updated", "datetime_added"]
-    ordering = ["-pubdate"]
+    ordering = "pubdate_descending"
     minmax_date_fields = ["pubdate"]
 
     class filterset_class(FilterSet):
