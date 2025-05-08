@@ -5,7 +5,7 @@ attrs==23.2.0; python_version >= '3.7'
 billiard==4.2.0; python_version >= '3.7'
 brotlipy==0.7.0
 celery==5.4.0; python_version >= '3.8'
-certifi==2025.1.31; python_version >= '3.6'
+certifi==2025.4.26; python_version >= '3.6'
 chardet==5.2.0; python_version >= '3.7'
 charset-normalizer==3.3.2; python_full_version >= '3.7.0'
 click==8.1.7; python_version >= '3.7'
