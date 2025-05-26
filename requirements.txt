@@ -48,4 +48,4 @@ whitenoise==6.7.0
 hyperlink==21.0.0
 dateparser==1.2.1
 stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/main-2025-02-04-14-14-39/stix2arango-0.0.4rc0-py3-none-any.whl
-dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2025-02-20-06-53-50/dogesec_commons-0.0.6-py3-none-any.whl
+dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2025-05-26-13-08-23/dogesec_commons-0.0.7rc1-py3-none-any.whl
