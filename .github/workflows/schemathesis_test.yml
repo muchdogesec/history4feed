@@ -84,7 +84,7 @@ jobs:
           checks: all
           wait-for-schema: '30'
           args: '--generation-allow-x00 false --show-trace'
-          version: 3.39.7
+          version: 3.39.15
 
       - name: test delete all
         id: test-endpoints-2
