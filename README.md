@@ -1,5 +1,7 @@
 # history4feed
 
+[![codecov](https://codecov.io/gh/muchdogesec/history4feed/graph/badge.svg?token=3Z5LELB8OP)](https://codecov.io/gh/muchdogesec/history4feed)
+
 ## Overview
 
 ![](docs/history4feed.png)
