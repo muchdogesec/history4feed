@@ -1,4 +1,4 @@
-name: Schemathesis Test
+name: Run Tests
 
 on:
   push:
@@ -9,7 +9,8 @@ on:
 jobs:
   test-schema-thesis:
     runs-on: ubuntu-latest
-    
+    environment: test_pipeline    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
