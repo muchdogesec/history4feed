@@ -28,7 +28,22 @@ dependencies = [
     "hyperlink",
     "django-filter>=24.2",
     "dateparser>=1.2.1",
+    "whitenoise==6.7.0",
   ]
 [project.urls]
 Homepage = "https://github.com/muchdogesec/history4feed"
 Issues = "https://github.com/muchdogesec/history4feed/issues"
+
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-subtests",
+    "pytest-cov",
+    "pytest-django",
+    "dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2025-05-29-05-04-20/dogesec_commons-0.0.7rc1-py3-none-any.whl",
+    "stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/main-2025-04-26-07-41-35/stix2arango-0.0.4rc0-py3-none-any.whl",
+]

@@ -17,7 +17,7 @@ DEFAULT_USER_AGENT = "curl"
 class SearchIndexError(FatalError):
     pass
 
-def fetch_posts_links_with_serper(site, from_time: dt, to_time: dt = None) -> dict[str, PostDict]:
+def fetch_posts_links_with_serper(site, from_time: dt, to_time: dt = None, delta_days=100) -> dict[str, PostDict]:
     s = requests.Session()
     s.headers.update({
         'X-API-KEY':  os.getenv("SERPER_API_KEY"),
@@ -34,7 +34,7 @@ def fetch_posts_links_with_serper(site, from_time: dt, to_time: dt = None) -> di
     credits_used = 0
 
     while frame_start < to_time:
-        frame_end = frame_start + timedelta(days=100)
+        frame_end = frame_start + timedelta(days=delta_days)
         params.update(q=f"site:{site} after:{frame_start.date().isoformat()} before:{frame_end.date().isoformat()}", page=1)
         while True:
             resp = s.get("https://google.serper.dev/search", params=params)

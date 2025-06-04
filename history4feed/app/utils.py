@@ -43,7 +43,7 @@ class MinMaxDateFilter(BaseFilterBackend):
                 queries[f"{field_name}__lte"] = self.parse_date(value)
             else:
                 queries[f"{field_name}__gte"] = self.parse_date(value)
-        return queryset.filter(Q(**queries))
+        return queryset.filter(**queries)
 
     def get_schema_operation_parameters(self, view):
         parameters = []

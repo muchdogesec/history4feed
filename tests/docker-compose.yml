@@ -1,0 +1,18 @@
+
+services:
+      pgdb2:
+        image: postgres
+        env_file:
+          - ./.env
+
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+            interval: 10s
+            retries: 5
+            start_period: 10s
+            timeout: 10s
+        ports:
+            - "15432:5432"
+
+volumes:
+  arangodb_data:

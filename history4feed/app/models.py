@@ -1,6 +1,7 @@
+import re
 from textwrap import dedent
 from typing import Iterable
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 import uuid
 from .settings import history4feed_server_settings
 from django.db import models
@@ -12,6 +13,7 @@ from django.db.models import Min, Max
 from django.db.models import OuterRef, Subquery
 from django.db.models import F
 from django.utils import timezone
+from django.db import transaction
 
 POST_DESCRIPTION_MAX_LENGTH = 2 * 1024 * 1024 # 2MiB
 FEED_DESCRIPTION_MAX_LENGTH = 10*1024 # 10KiB
@@ -44,7 +46,10 @@ def stix_id(url):
 
 def normalize_url(url):
     try:
+        url = re.sub(r'(?<!:)/{2,}', '/', url)
         u = hyperlink.parse(url)
+        if not u.scheme:
+            raise validators.ValidationError('url must be a full path')
         return u.normalize(url).to_text()
     except Exception as e:
         raise validators.ValidationError(f"URL normalization failed")
@@ -115,13 +120,23 @@ class Job(models.Model):
         return (not self.include_remote_blogs) and urlparse(self.feed.url).hostname.split('.')[-2:] != urlparse(post_link).hostname.split('.')[-2:]
     
     def cancel(self):
-        if self.state in [JobState.PENDING, JobState.RUNNING]:
-            self.state = JobState.CANCELLED
+        self.update_state(JobState.CANCELLED)
         self.save()
         return
     
     def is_cancelled(self):
         return self.state == JobState.CANCELLED
+    
+    @transaction.atomic
+    def update_state(self, state):
+        obj = self.__class__.objects.select_for_update().get(pk=self.pk)
+        if obj.state not in [JobState.PENDING, JobState.RUNNING]:
+            return obj.state
+        obj.state = state
+        obj.save()
+        self.refresh_from_db()
+        return obj.state
+    
 
 
 class FullTextState(models.TextChoices):
@@ -153,6 +168,7 @@ class Post(models.Model):
         ]
 
     def add_categories(self, categories):
+        categories = categories or []
         categories = [Category.objects.get_or_create(name=name)[0] for name in categories]
         self.categories.set(categories)
 
