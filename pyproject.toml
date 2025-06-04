@@ -29,6 +29,7 @@ dependencies = [
     "django-filter>=24.2",
     "dateparser>=1.2.1",
     "whitenoise==6.7.0",
+    "readability-lxml"
   ]
 [project.urls]
 Homepage = "https://github.com/muchdogesec/history4feed"
