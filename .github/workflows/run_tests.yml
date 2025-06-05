@@ -1,0 +1,93 @@
+name: Run Unit and Schema Tests
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  unittest-and-schemathesis:
+    runs-on: ubuntu-latest
+    environment: test_pipeline
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+    
+          
+      - name: Set .env for docker-compose
+        run: |
+
+            cat tests/tests.env >> .env
+            echo POSTGRES_PORT=5432 >> .env
+            echo POSTGRES_HOST=pgdb >> .env
+            cp tests/docker-compose.yml test-compose.yml
+
+            echo ==== env file start =====
+            cat .env
+            echo
+            echo ==== env file end   =====
+
+         
+      - name: Start docker-compose
+        uses: hoverkraft-tech/compose-action@v2.0.2
+        with:
+          compose-file: |
+            test-compose.yml
+            docker-compose.yml
+          compose-flags:
+            --env-file .env
+            -p history4feed-action
+
+      - name: Get IP addresses
+        id: get_ip
+        run: |
+              IP_ADDRESS=$(docker network inspect -f '{{range.IPAM.Config}}{{.Gateway}}{{end}}' history4feed-action_default)
+              echo "ip_address=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
+              echo "IP_ADDRESS=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
+              echo "SERVICE_BASE_URL=http://$IP_ADDRESS:8002/" >> "$GITHUB_OUTPUT"
+              cat "$GITHUB_OUTPUT"
+      
+      - name: run unit tests with pytest+coverage
+        id: test-endpoints
+        run: |
+          pip install -e .[test]
+          set -a; source .env; source tests/tests.env; set +a
+          export DJANGO_WWW_PATH=$PWD/django_www_path/
+          mkdir -p $DJANGO_WWW_PATH
+          export POSTGRES_HOST="${{ steps.get_ip.outputs.IP_ADDRESS }}"
+          export PYTHONPATH=.
+
+          pytest --cov --cov-branch --cov-report=xml --junitxml=junit.xml -o junit_family=legacy tests/src
+
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: run schemathesis
+        uses: schemathesis/action@v1
+        if: always()
+        with:
+          schema: ${{ steps.get_ip.outputs.SERVICE_BASE_URL }}/api/schema/
+          checks: all
+          wait-for-schema: '30'
+          args: '--generation-allow-x00 false -H "Host: localhost"'

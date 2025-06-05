@@ -55,7 +55,7 @@ from django_filters.rest_framework import (
 from django.db.models import Count, Q, Subquery, OuterRef
 from datetime import datetime
 import textwrap
-from django.utils import timezone
+import django.utils
 
 from history4feed.app import serializers
 
@@ -275,7 +275,7 @@ class FeedView(viewsets.ModelViewSet):
         "earliest_item_pubdate",
         "latest_item_pubdate",
     ]
-    ordering = ["-datetime_added"]
+    ordering = "datetime_added_descending"
     minmax_date_fields = ["earliest_item_pubdate", "latest_item_pubdate"]
 
     class filterset_class(FilterSet):
@@ -432,7 +432,7 @@ class FeedView(viewsets.ModelViewSet):
         feed_obj: Feed = self.get_object()
         s = FeedPatchSerializer(feed_obj, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
-        s.save(datetime_modified=timezone.now())
+        s.save(datetime_modified=django.utils.timezone.now())
         return Response(self.serializer_class(feed_obj).data, status=status.HTTP_201_CREATED)
     
     @extend_schema(
@@ -570,7 +570,6 @@ class RSSView(viewsets.GenericViewSet):
         return PostOnlyView.get_queryset(self).filter(feed_id=self.kwargs.get("feed_id"))
 
 
-
 @extend_schema_view(
     retrieve=extend_schema(
         parameters=[FEED_ID_PARAM, POST_ID_PARAM],
@@ -695,8 +694,7 @@ class feed_post_view(
     def new_reindex_feed_job(self, feed_id):
         posts = self.get_queryset().all()
         feed_obj = get_object_or_404(Feed, id=feed_id)
-
-        job_obj = task_helper.new_patch_posts_job(feed_obj, posts)
+        job_obj = task_helper.new_patch_posts_job(feed_obj, tuple(posts))
         return job_obj
 
 
@@ -726,9 +724,6 @@ class JobView(
 
     def get_queryset(self):
         return Job.objects.all().annotate(count_of_items=Count("fulltext_jobs"))
-
-    def filter_queryset(self, queryset):
-        return super().filter_queryset(queryset)
 
     @extend_schema(
         summary="Search Jobs",

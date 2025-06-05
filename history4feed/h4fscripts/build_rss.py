@@ -12,23 +12,23 @@ def build_rss(feed_obj: Feed, posts_set: BaseManager[Post]):
     return document.toprettyxml()
 
 def build_entry_element(post: Post, d: Document):
-        element = d.createElement('item')
-        element.appendChild(createTextElement(d, "title", post.title))
+    element = d.createElement('item')
+    element.appendChild(createTextElement(d, "title", post.title))
 
-        link = createTextElement(d, "link", post.link)
-        link.setAttribute("href", post.link)
-        element.appendChild(link)
-        element.appendChild(createTextElement(d, "pubDate", post.pubdate.isoformat()))
-        if post.description:
-            description = post.description
-            description = description
-            element.appendChild(createTextElement(d, "description", description))
+    link = createTextElement(d, "link", post.link)
+    link.setAttribute("href", post.link)
+    element.appendChild(link)
+    element.appendChild(createTextElement(d, "pubDate", post.pubdate.isoformat()))
+    if post.description:
+        description = post.description
+        description = description
+        element.appendChild(createTextElement(d, "description", description))
 
-        for category in post.categories.all():
-            element.appendChild(createTextElement(d, "category", category.name))
+    for category in post.categories.all():
+        element.appendChild(createTextElement(d, "category", category.name))
 
-        if post.author:
-            author = d.createElement('author')
-            author.appendChild(createTextElement(d, "name", post.author))
-            element.appendChild(author)
-        return element
+    if post.author:
+        author = d.createElement('author')
+        author.appendChild(createTextElement(d, "name", post.author))
+        element.appendChild(author)
+    return element

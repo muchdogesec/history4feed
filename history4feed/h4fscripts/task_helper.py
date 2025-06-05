@@ -33,20 +33,19 @@ def queue_lock(feed: models.Feed, job=None):
     return status
 
 
-
+@transaction.atomic()
 def new_job(feed: models.Feed, include_remote_blogs):
-    with transaction.atomic():
-        job_obj = models.Job.objects.create(
-            feed=feed,
-            earliest_item_requested=feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE,
-            latest_item_requested=datetime.now(UTC),
-            include_remote_blogs=include_remote_blogs,
-        )
-        if not queue_lock(feed, job_obj):
-            raise Throttled(detail={"message": "A job is already running for this feed", **cache.get(get_lock_id(feed))})
+    job_obj = models.Job.objects.create(
+        feed=feed,
+        earliest_item_requested=feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE,
+        latest_item_requested=datetime.now(UTC),
+        include_remote_blogs=include_remote_blogs,
+    )
+    if not queue_lock(feed, job_obj):
+        raise Throttled(detail={"message": "A job is already running for this feed", **cache.get(get_lock_id(feed))})
 
-        (start_job.s(job_obj.pk)| retrieve_posts_from_links.s(job_obj.pk) | wait_for_all_with_retry.s() | collect_and_schedule_removal.si(job_obj.pk)).apply_async(countdown=5, link_error=error_handler.s(job_obj.pk))
-        return job_obj
+    (start_job.s(job_obj.pk) | retrieve_posts_from_links.s(job_obj.pk) | wait_for_all_with_retry.s() | collect_and_schedule_removal.si(job_obj.pk)).apply_async(countdown=5, link_error=error_handler.s(job_obj.pk))
+    return job_obj
 
 def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_remote_blogs=True):
     job_obj = models.Job.objects.create(
@@ -72,7 +71,7 @@ def start_post_job(self: CeleryTask, job_id):
         return False
     if not queue_lock(job.feed, job):
         return self.retry(max_retries=360)
-    job.state = models.JobState.RUNNING
+    job.update_state(models.JobState.RUNNING)
     job.save()
     return True
 
@@ -80,14 +79,14 @@ def start_post_job(self: CeleryTask, job_id):
 def start_job(job_id):
     job = models.Job.objects.get(pk=job_id)
     feed = job.feed
-    job.state = models.JobState.RUNNING
+    job.update_state(models.JobState.RUNNING)
     job.save()
     try:
         if feed.feed_type == models.FeedType.SEARCH_INDEX:
             return [feed.url]
         return wayback_helpers.get_wayback_urls(feed.url, job.earliest_item_requested, job.latest_item_requested)
     except BaseException as e:
-        job.state = models.JobState.FAILED
+        job.update_state(models.JobState.FAILED)
         job.info = str(e)
         job.save()
         return []
@@ -115,11 +114,7 @@ def retrieve_posts_from_links(urls, job_id):
             break
         error = None
         if feed.feed_type == models.FeedType.SEARCH_INDEX:
-            start_time = feed.freshness or settings.EARLIEST_SEARCH_DATE
-            if not start_time.tzinfo:
-                start_time = start_time.replace(tzinfo=UTC)
-            crawled_posts = fetch_posts_links_with_serper(url, from_time=start_time, to_time=job.run_datetime)
-            posts = [add_new_post(feed, job, post_dict) for post_dict in crawled_posts.values()]
+            posts = retrieve_posts_from_serper(feed, job, url)
         else:
             parsed_feed, posts, error = retrieve_posts_from_url(url, feed, job)
         if error:
@@ -129,15 +124,7 @@ def retrieve_posts_from_links(urls, job_id):
             logger.warning('no new post in `%s`', url)
             continue
 
-        chain_tasks = []
-        for post in posts:
-            ftjob_entry = models.FulltextJob.objects.create(
-                job_id=job_id,
-                post_id=post.id,
-                link=post.link,
-            )
-            chain_tasks.append(retrieve_full_text.si(ftjob_entry.pk))
-        full_text_chain = celery.chain(chain_tasks)
+        full_text_chain = create_fulltexts_task_chain(job_id, posts)
         chains.append(full_text_chain.apply_async())
 
     if parsed_feed:
@@ -149,6 +136,28 @@ def retrieve_posts_from_links(urls, job_id):
     logger.info("====\n"*5)
     return [result.id for result in chains]
 
+def create_fulltexts_task_chain(job_id, posts):
+    chain_tasks = []
+    for post in posts:
+        ftjob_entry = models.FulltextJob.objects.create(
+                job_id=job_id,
+                post_id=post.id,
+                link=post.link,
+            )
+        chain_tasks.append(retrieve_full_text.si(ftjob_entry.pk))
+    return celery.chain(chain_tasks)
+
+def retrieve_posts_from_serper(feed, job, url):
+    start_time = feed.freshness or settings.EARLIEST_SEARCH_DATE
+    if not start_time.tzinfo:
+        start_time = start_time.replace(tzinfo=UTC)
+    crawled_posts = fetch_posts_links_with_serper(url, from_time=start_time, to_time=job.run_datetime)
+    posts = []
+    for post_dict in crawled_posts.values():
+        if post := add_post_to_db(feed, job, post_dict):
+            posts.append(post)
+    return posts
+
 class JobCancelled(Exception):
     pass
 
@@ -158,7 +167,7 @@ def collect_and_schedule_removal(sender, job_id):
     job = models.Job.objects.get(pk=job_id)
     remove_lock(job)
     if job.state == models.JobState.RUNNING:
-        job.state = models.JobState.SUCCESS
+        job.update_state(models.JobState.SUCCESS)
         job.save()
 
 def remove_lock(job):
@@ -180,15 +189,16 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job: models.Job):
                 raise JobCancelled("job was terminated by user")
             data, content_type, url = h4f.fetch_page_with_retries(url)
             parsed_feed = h4f.parse_feed_from_content(data, url)
-            if parsed_feed['feed_type'] == models.FeedType.ATOM:
-                posts = h4f.parse_posts_from_atom_feed(url, data)
-            elif parsed_feed['feed_type'] == models.FeedType.RSS:
-                posts = h4f.parse_posts_from_rss_feed(url, data)
-            else:
-                raise exceptions.UnknownFeedtypeException("unknown feed type `{}` at {}".format(parsed_feed['feed_type'], url))
+            match parsed_feed['feed_type']:
+                case models.FeedType.ATOM:
+                    posts = h4f.parse_posts_from_atom_feed(url, data)
+                case models.FeedType.RSS:
+                    posts = h4f.parse_posts_from_rss_feed(url, data)
+                case _:
+                    raise exceptions.UnknownFeedtypeException("unknown feed type `{}` at {}".format(parsed_feed['feed_type'], url))
             for post_dict in posts.values():
                 # make sure that post and feed share the same domain
-                post = add_new_post(db_feed, job, post_dict)
+                post = add_post_to_db(db_feed, job, post_dict)
                 if not post:
                     continue
                 all_posts.append(post)
@@ -206,7 +216,7 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job: models.Job):
             break
     return parsed_feed, all_posts, error
 
-def add_new_post(db_feed: models.Feed, job: models.Job, post_dict: h4f.PostDict):
+def add_post_to_db(db_feed: models.Feed, job: models.Job, post_dict: h4f.PostDict):
     # make sure that post and feed share the same domain
     if job.should_skip_post(post_dict.link):
         models.FulltextJob.objects.create(
@@ -225,8 +235,8 @@ def add_new_post(db_feed: models.Feed, job: models.Job, post_dict: h4f.PostDict)
     post.add_categories(categories)
     return post
         
-@shared_task(bind=True)
-def retrieve_full_text(self, ftjob_pk):
+@shared_task()
+def retrieve_full_text(ftjob_pk):
     fulltext_job = models.FulltextJob.objects.get(pk=ftjob_pk)
     try:
         if fulltext_job.is_cancelled():
@@ -244,7 +254,6 @@ def retrieve_full_text(self, ftjob_pk):
         fulltext_job.status = models.FullTextState.FAILED
     fulltext_job.save()
     fulltext_job.post.save()
-    logger.print(f"{self}")
 
 
 
@@ -256,7 +265,7 @@ def mark_old_jobs_as_failed(**kwargs):
 @shared_task
 def error_handler(request, exc: Exception, traceback, job_id):
     job = models.Job.objects.get(pk=job_id)
-    job.state = models.JobState.FAILED
+    job.update_state(models.JobState.FAILED)
     job.info = f"job failed: {exc}"
     job.save()
     remove_lock(job)

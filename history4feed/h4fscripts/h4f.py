@@ -41,23 +41,11 @@ class FatalError(Exception):
     pass
 
 def fetch_page(session, url, headers=None) -> tuple[bytes, str, str]:
-    proxy_apikey = os.getenv("SCRAPFLY_APIKEY")
+    proxy_apikey = settings.SCRAPFLY_APIKEY
     headers = headers or {}
 
     if proxy_apikey:
-        logger.info(f"Fetching `{url}` via scrapfly.io")
-        headers = dict((f"headers[{k}]", v) for k, v in headers.items())
-        resp = session.get("https://api.scrapfly.io/scrape", params=dict(**headers, key=proxy_apikey, url=url, country="us,ca,mx,gb,fr,de,au,at,be,hr,cz,dk,ee,fi,ie,se,es,pt,nl"))
-        json_data = resp.json()
-        if resp.status_code != 200:
-            raise ScrapflyError(json_data)
-        result = SimpleNamespace(**json_data['result'])
-        if result.status_code > 499:
-            raise FatalError(f"Got server error {result.status_code}, stopping")
-        if result.status_code > 399:
-            raise history4feedException(f"PROXY_GET Request failed for `{url}`, status: {result.status_code}, reason: {result.status}")
-        elif result.status_code > 299:
-            raise FetchRedirect(f"PROXY_GET for `{url}` redirected, status: {result.status_code}, reason: {result.status}")
+        headers, result = fetch_with_scapfly(session, url, headers, proxy_apikey)
         return result.content.encode(), result.content_type, result.url
 
     logger.info(f"Fetching `{url}`")
@@ -73,9 +61,33 @@ def fetch_page(session, url, headers=None) -> tuple[bytes, str, str]:
         logger.print(f"brotli decompress fail: {err}")
     return content, resp.headers.get("content-type"), resp.url
 
+def fetch_with_scapfly(session, url, headers, proxy_apikey):
+    logger.info(f"Fetching `{url}` via scrapfly.io")
+    headers = dict((f"headers[{k}]", v) for k, v in headers.items())
+    resp = session.get("https://api.scrapfly.io/scrape", params=dict(**headers, key=proxy_apikey, url=url, country="us,ca,mx,gb,fr,de,au,at,be,hr,cz,dk,ee,fi,ie,se,es,pt,nl"))
+    json_data = resp.json()
+    if resp.status_code != 200:
+        raise ScrapflyError(json_data)
+    result = SimpleNamespace(**json_data['result'])
+    if result.status_code > 499:
+        raise FatalError(f"Got server error {result.status_code}, stopping")
+    if result.status_code > 399:
+        raise history4feedException(f"PROXY_GET Request failed for `{url}`, status: {result.status_code}, reason: {result.status}")
+    elif result.status_code > 299:
+        raise FetchRedirect(f"PROXY_GET for `{url}` redirected, status: {result.status_code}, reason: {result.status}")
+    return headers,result
+
 def parse_feed_from_url(url):
     data, content_type, url = fetch_page_with_retries(url, retry_count=0)
     return parse_feed_from_content(data, url)
+
+def get_full_text(link):
+    try:
+        page, content_type, url = fetch_page_with_retries(link)
+        doc  = ReadabilityDocument(page, url=url)
+        return doc.summary(), content_type
+    except BaseException as e:
+        raise history4feedException(f"Error processing fulltext: {e}") from e
 
 
 @dataclass
@@ -184,19 +196,3 @@ def parse_atom_description(item: Element):
 
 def parse_rss_description(item: Element):
     return getText(getFirstChildByTag(item, "description"))
-
-
-def is_valid_atom_feed(xml):
-    pass
-
-def is_valid_atom_feed(xml):
-    pass
-
-def get_full_text(link):
-    try:
-        page, content_type, url = fetch_page_with_retries(link)
-        doc  = ReadabilityDocument(page, url=url)
-        return doc.summary(), content_type
-    except BaseException as e:
-        raise history4feedException(f"Error processing fulltext: {e}") from e
-    
