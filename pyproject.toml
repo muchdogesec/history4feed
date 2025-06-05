@@ -5,32 +5,34 @@ build-backend = "hatchling.build"
 [project]
 name = "history4feed"
 version = "0.0.1-pre"
-authors = [
-  { name="DOGESEC", email="support@dogesec.com" },
-]
+authors = [{ name = "DOGESEC", email = "support@dogesec.com" }]
 description = "History4Feed"
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
 ]
 dependencies = [
-    "djangorestframework>=3.15.2",
-    "drf-spectacular>=0.27.2",
-    "celery>=5.4.0; python_version >= '3.8'",
-    "psycopg2-binary>=2.9.10",
-    "redis",
-    "brotlipy>=0.7.0",
-    "lxml-html-clean>=0.4.1",
-    "fake-useragent>=1.5.1",
-    "hyperlink",
-    "django-filter>=24.2",
-    "dateparser>=1.2.1",
-    "whitenoise==6.7.0",
-    "readability-lxml"
-  ]
+  "django",
+  "djangorestframework>=3.15.2",
+  "drf-spectacular>=0.27.2",
+  "celery>=5.4.0; python_version >= '3.8'",
+  "psycopg2-binary>=2.9.10",
+  "redis",
+  "brotlipy>=0.7.0",
+  "lxml-html-clean>=0.4.1",
+  "fake-useragent>=1.5.1",
+  "hyperlink",
+  "django-filter>=24.2",
+  "dateparser>=1.2.1",
+  "whitenoise==6.7.0",
+  "readability-lxml",
+  "python-dotenv",
+  "requests",
+  "gunicorn",
+]
 [project.urls]
 Homepage = "https://github.com/muchdogesec/history4feed"
 Issues = "https://github.com/muchdogesec/history4feed/issues"
@@ -41,10 +43,10 @@ allow-direct-references = true
 
 [project.optional-dependencies]
 test = [
-    "pytest",
-    "pytest-subtests",
-    "pytest-cov",
-    "pytest-django",
-    "dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2025-05-29-05-04-20/dogesec_commons-0.0.7rc1-py3-none-any.whl",
-    "stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/main-2025-04-26-07-41-35/stix2arango-0.0.4rc0-py3-none-any.whl",
+  "pytest",
+  "pytest-subtests",
+  "pytest-cov",
+  "pytest-django",
+  "dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2025-05-29-05-04-20/dogesec_commons-0.0.7rc1-py3-none-any.whl",
+  "stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/main-2025-04-26-07-41-35/stix2arango-0.0.4rc0-py3-none-any.whl",
 ]

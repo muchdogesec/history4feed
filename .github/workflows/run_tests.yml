@@ -1,4 +1,4 @@
-name: Run Tests
+name: Run Unit and Schema Tests
 
 permissions:
   contents: read
@@ -10,7 +10,7 @@ on:
   pull_request:
 
 jobs:
-  test-schema-thesis:
+  unittest-and-schemathesis:
     runs-on: ubuntu-latest
     environment: test_pipeline
     
@@ -59,7 +59,7 @@ jobs:
               echo "SERVICE_BASE_URL=http://$IP_ADDRESS:8002/" >> "$GITHUB_OUTPUT"
               cat "$GITHUB_OUTPUT"
       
-      - name: run unit tests with pytest+codecov
+      - name: run unit tests with pytest+coverage
         id: test-endpoints
         run: |
           pip install -e .[test]
