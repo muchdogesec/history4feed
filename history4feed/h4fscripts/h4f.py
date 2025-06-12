@@ -84,7 +84,7 @@ def parse_feed_from_url(url):
 def get_full_text(link):
     try:
         page, content_type, url = fetch_page_with_retries(link)
-        doc  = ReadabilityDocument(page, url=url)
+        doc  = ReadabilityDocument(page.decode(), url=url)
         return doc.summary(), content_type
     except BaseException as e:
         raise history4feedException(f"Error processing fulltext: {e}") from e

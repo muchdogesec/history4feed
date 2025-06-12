@@ -363,10 +363,10 @@ class FeedView(viewsets.ModelViewSet):
             elif v := feed_data.get(k):
                 feed_data[k] = v + AUTO_TITLE_TRAIL
         
-        s = FeedSerializer(data={**s.data, **feed_data})
-        s.is_valid(raise_exception=True)
+        s2 = FeedSerializer(data={**s.data, **feed_data})
+        s2.is_valid(raise_exception=True)
 
-        feed_obj: Feed = s.save(feed_type=feed_data['feed_type'])
+        feed_obj: Feed = s2.save(feed_type=feed_data['feed_type'])
         job_obj = task_helper.new_job(feed_obj, s.validated_data.get('include_remote_blogs', False))
         return job_obj
 
