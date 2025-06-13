@@ -15,7 +15,7 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 dependencies = [
-  "django",
+  "django>=5.2.3",
   "djangorestframework>=3.15.2",
   "drf-spectacular>=0.27.2",
   "celery>=5.4.0; python_version >= '3.8'",
@@ -30,7 +30,7 @@ dependencies = [
   "whitenoise==6.7.0",
   "readability-lxml",
   "python-dotenv",
-  "requests",
+  "requests>=2.32.4",
   "gunicorn",
 ]
 [project.urls]

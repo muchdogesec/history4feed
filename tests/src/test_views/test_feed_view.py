@@ -76,15 +76,17 @@ def test_create_feed(client):
         assert str(resp.data["job_id"]) == str(job.id)
 
 
+@pytest.mark.parametrize("include_remote_blogs", [True, False])
 @pytest.mark.parametrize("use_search_index", [True, False])
 @pytest.mark.django_db
-def test_new_create_job_with_regular_feed(use_search_index):
+def test_new_create_job(use_search_index, include_remote_blogs):
     request = MagicMock()
     request.data = dict(
         title="some title",
         description="some description",
         url="https://example.net/",
         use_search_index=use_search_index,
+        include_remote_blogs=include_remote_blogs,
     )
     with (
         patch(
@@ -103,7 +105,7 @@ def test_new_create_job_with_regular_feed(use_search_index):
         result = FeedView().new_create_job(request)
         assert result.feed.title == request.data["title"]
         assert result.feed.description == request.data["description"]
-        mock_new_job.assert_called_once_with(result.feed, False)
+        mock_new_job.assert_called_once_with(result.feed, include_remote_blogs)
         if use_search_index:
             mock_search_index_serializer.assert_called_once_with(data=request.data)
             assert result.feed.feed_type == FeedType.SEARCH_INDEX
@@ -209,14 +211,14 @@ def test_new_fetch_job():
 
 
 @pytest.mark.parametrize(
-    ['filters', 'expected'],
+    ["filters", "expected"],
     [
         [dict(), (0, 1, 2)],
-        [dict(title='fEed'), (0, 1, 2)],
-        [dict(title='feed 2'), (1,)],
-        [dict(description='-iption', title='feed'), (1,)],
-        [dict(feed_type='skeleton'), (2,)],
-    ]
+        [dict(title="fEed"), (0, 1, 2)],
+        [dict(title="feed 2"), (1,)],
+        [dict(description="-iption", title="feed"), (1,)],
+        [dict(feed_type="skeleton"), (2,)],
+    ],
 )
 @pytest.mark.django_db
 def test_list_feed(client, filters, expected):
@@ -242,8 +244,9 @@ def test_list_feed(client, filters, expected):
     expected_ids = {str(feeds[i].id) for i in expected}
     resp = client.get("/api/v1/feeds/", query_params=filters)
     assert resp.status_code == 200
-    assert len(resp.data['feeds']) == len(expected_ids)
-    assert {feed['id'] for feed in resp.data['feeds']} == expected_ids
+    assert len(resp.data["feeds"]) == len(expected_ids)
+    assert {feed["id"] for feed in resp.data["feeds"]} == expected_ids
+
 
 @pytest.mark.django_db
 def test_retrieve(client):
@@ -256,8 +259,7 @@ def test_retrieve(client):
     another_uuid = uuid.uuid4()
     resp = client.get(f"/api/v1/feeds/{feed.id}/")
     assert resp.status_code == 200
-    assert resp.data['id'] == str(feed.id)
+    assert resp.data["id"] == str(feed.id)
 
     resp = client.get(f"/api/v1/feeds/{another_uuid}/")
     assert resp.status_code == 404
-

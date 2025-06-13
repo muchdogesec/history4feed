@@ -224,19 +224,16 @@ def test_fetch_with_scapfly_redirect(dummy_url):
 
 @patch("history4feed.h4fscripts.h4f.ReadabilityDocument", side_effect=ReadabilityDocument)
 @patch("history4feed.h4fscripts.h4f.fetch_page_with_retries")
-@patch.object(ReadabilityDocument, 'summary')
+@patch.object(ReadabilityDocument, 'summary', side_effect=ReadabilityDocument.summary, autospec=True)
 def test_get_full_text_success(mock_summary, mock_fetch, mock_readability, dummy_url):
     mock_fetch.return_value = (b"<html>Article</html>", "text/html", dummy_url)
-    mock_doc = MagicMock()
-    mock_summary.return_value = "<div>Summary</div>"
-    mock_readability.return_value = mock_doc
 
     summary, ctype = get_full_text(dummy_url)
 
-    assert summary == "<div>Summary</div>"
+    assert isinstance(summary, str)
     assert ctype == "text/html"
     mock_fetch.assert_called_once_with(dummy_url)
-    mock_readability.assert_called_once_with(b"<html>Article</html>", url=dummy_url)
+    mock_readability.assert_called_once_with("<html>Article</html>", url=dummy_url)
     mock_summary.assert_called_once()
 
 
