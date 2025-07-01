@@ -1,32 +1,71 @@
 name: Create Release
-run-name: creating release
+run-name: Creating release
+
 on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - 'main'
 
 jobs:
   create-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install pypa/build
-        run: python3 -m pip install build --user
 
-      - name: Build a binary wheel and a source tarball
-        run: python3 -m build 
+      - name: Install build dependencies
+        run: python3 -m pip install build hatchling
 
-      - name: Make release
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+      - name: Extract version from pyproject.toml
+        id: get-version
         run: |
-          REF_NAME="${{ github.ref_name }}-$(date +"%Y-%m-%d-%H-%M-%S")"
-          gh release create "$REF_NAME" --repo '${{ github.repository }}' --notes ""
-          gh release upload "$REF_NAME" dist/** --repo '${{ github.repository }}'
+          VERSION=$(python -m hatchling version)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build package
+        run: python3 -m build
+
+      - name: Determine release tag
+        id: release-tag
+        run: |
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "tag=${{ steps.get-version.outputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ steps.get-version.outputs.version }}-beta-$(date +"%Y-%m-%d-%H-%M-%S")" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.release-tag.outputs.tag }}"
+          gh release create "$TAG" --repo "${{ github.repository }}" --notes ""
+          gh release upload "$TAG" dist/** --repo "${{ github.repository }}"
+
+      - name: Clean up old beta releases (keep latest 10)
+        if: github.ref_name != 'main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release list --limit 100 --repo "${{ github.repository }}" --json tagName,createdAt \
+            | jq -r '.[] | select(.tagName | test("-beta-")) | [.tagName, .createdAt] | @tsv' \
+            | sort -k2 -r \
+            | tail -n +11 \
+            | cut -f1 \
+            | while read old_tag; do
+                echo "Deleting old beta release: $old_tag"
+                gh release delete "$old_tag" --repo "${{ github.repository }}" --cleanup-tag --yes
+              done
+
+      - name: Publish package distributions to PyPI
+        if: github.ref_name == 'main'
+        uses: pypa/gh-action-pypi-publish@release/v1
