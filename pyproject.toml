@@ -4,9 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "history4feed"
-version = "0.0.2"
-authors = [{ name = "DOGESEC", email = "support@dogesec.com" }]
-description = "History4Feed"
+version = "1.0.0"
+authors = [
+  { name = "dogesec" }
+]
+maintainers = [
+  { name = "dogesec" }
+]
+description = "Creates a complete full text historical archive for an RSS or ATOM feed."
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
