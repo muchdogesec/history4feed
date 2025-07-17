@@ -59,7 +59,7 @@ djangorestframework==3.16.0
     #   dogesec-commons
     #   drf-spectacular
     #   history4feed (pyproject.toml)
-dogesec-commons==1.0.3
+dogesec-commons==1.1.0
     # via history4feed (pyproject.toml)
 drf-spectacular==0.28.0
     # via
