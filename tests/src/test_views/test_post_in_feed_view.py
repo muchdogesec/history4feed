@@ -1,40 +1,23 @@
 import pytest
-from django.urls import reverse
 from rest_framework import status
-from history4feed.app.models import Feed, Job, Post
-from uuid import uuid4
+from history4feed.app.models import Feed, Job
 from unittest.mock import MagicMock, patch
-from datetime import datetime as dt
 
-from history4feed.app.serializers import JobSerializer, PostSerializer
-from history4feed.app.views import FeedPostView, feed_post_view
+from history4feed.app.serializers import JobSerializer
+from history4feed.app.views import feed_post_view
 
 import pytest
 from rest_framework import status
-from history4feed.app.models import Post, Feed, Job
-from datetime import datetime as dt
+from history4feed.app.models import Feed, Job
 from unittest.mock import patch
-from history4feed.app.serializers import PostWithFeedIDSerializer
-from history4feed.app.views import FeedPostView
-from dateutil.parser import parse as parse_date
 
 
-from history4feed.app.utils import (
-    DatetimeFieldUTC,
-    Ordering,
-    Pagination,
-    MinMaxDateFilter,
-)
 
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from history4feed.app.serializers import PostWithFeedIDSerializer
-from history4feed.app.models import Post, Feed, Job
+from history4feed.app.models import Feed, Job
 from rest_framework import (
     status,
-)
-from django_filters.rest_framework import (
-    DjangoFilterBackend,
 )
 
 
@@ -69,8 +52,7 @@ def test_create_post_in_feed_success(client):
 
 
 @pytest.mark.django_db
-def test_new_create_post_job():
-    feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
+def test_new_create_post_job(feed):
     posts_data = [
         {
             "link": "https://example.com/test-post",
@@ -91,15 +73,8 @@ def test_new_create_post_job():
 
 
 @pytest.mark.django_db
-def test_reindex_feed(client):
-    feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
-    p1 = Post.objects.create(feed=feed, title="First post", pubdate=dt.now())
-    p2 = Post.objects.create(
-        feed=feed,
-        title="Second post",
-        pubdate=dt.now(),
-        link="https://example.net/post2",
-    )
+def test_reindex_feed(client, feed_posts):
+    feed, posts = feed_posts
     job = Job.objects.create(feed=feed)
     with (
         patch("history4feed.app.views.task_helper.new_patch_posts_job") as mock_new_job,
@@ -110,7 +85,7 @@ def test_reindex_feed(client):
     ):
         mock_new_job.return_value = job
         resp = client.patch(f"/api/v1/feeds/{feed.id}/posts/reindex/")
-        mock_new_job.assert_called_once_with(feed, (p1, p2))
+        mock_new_job.assert_called_once_with(feed, posts)
         mock_job_s_class.assert_called_once_with(job)
         assert resp.data["id"] == str(job.id)
         assert resp.data["feed_id"] == str(job.feed.id)

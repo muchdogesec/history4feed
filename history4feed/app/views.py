@@ -645,6 +645,7 @@ class feed_post_view(
         responses={
             201: PostJobSerializer,
             404: OpenApiResponse(CommonErrorSerializer, "Feed does not exist", examples=[HTTP404_EXAMPLE]),
+            400: OpenApiResponse(CommonErrorSerializer, "Bad request", examples=[HTTP400_EXAMPLE]),
         },
         request=CreatePostsSerializer,
     )

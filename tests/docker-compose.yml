@@ -1,18 +1,32 @@
 
 services:
-      pgdb2:
-        image: postgres
-        env_file:
-          - ./.env
-
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-            interval: 10s
-            retries: 5
-            start_period: 10s
-            timeout: 10s
-        ports:
-            - "15432:5432"
-
+  arangodb:
+    image: arangodb/arangodb
+    volumes:
+      - arangodb_data:/var/lib/arangodb3
+    environment:
+      ARANGO_ROOT_PASSWORD: ${ARANGODB_PASSWORD}
+    ports:
+      - "18529:8529"
+    healthcheck:
+      test: ["CMD-SHELL", 'curl -u "$ARANGODB_USERNAME:$ARANGODB_PASSWORD" localhost:8529/_api ']
+      interval: 10s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
+  pgdb2:
+    image: postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
+    ports:
+      - "15432:5432"
 volumes:
   arangodb_data:

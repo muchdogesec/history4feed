@@ -49,7 +49,7 @@ def new_job(feed: models.Feed, include_remote_blogs):
 
 def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_remote_blogs=True):
     job_obj = models.Job.objects.create(
-        feed=posts[0].feed,
+        feed=feed,
         state=models.JobState.PENDING,
         include_remote_blogs=include_remote_blogs,
     )

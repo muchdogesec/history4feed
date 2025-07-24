@@ -178,4 +178,4 @@ class JobSerializer(serializers.ModelSerializer):
         exclude = ['feed']
 
 class PostJobSerializer(JobSerializer):
-    pass
+    count_of_items = None

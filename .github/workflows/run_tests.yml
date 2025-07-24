@@ -1,7 +1,4 @@
-name: Run Unit and Schema Tests
-
-permissions:
-  contents: read
+name: Run Tests
 
 on:
   push:
@@ -9,8 +6,11 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  unittest-and-schemathesis:
+  run-tests:
     runs-on: ubuntu-latest
     environment: test_pipeline
     
@@ -24,52 +24,45 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-    
-          
-      - name: Set .env for docker-compose
-        run: |
 
-            cat tests/tests.env >> .env
-            echo POSTGRES_PORT=5432 >> .env
-            echo POSTGRES_HOST=pgdb >> .env
-            cp tests/docker-compose.yml test-compose.yml
-
-            echo ==== env file start =====
-            cat .env
-            echo
-            echo ==== env file end   =====
-
-         
+               
       - name: Start docker-compose
         uses: hoverkraft-tech/compose-action@v2.0.2
         with:
-          compose-file: |
-            test-compose.yml
-            docker-compose.yml
+          compose-file: tests/docker-compose.yml
           compose-flags:
-            --env-file .env
-            -p history4feed-action
+            --env-file tests/tests.env
+            -p h4f-action
 
-      - name: Get IP addresses
-        id: get_ip
+      - name: Wait for container to start
+        run: sleep 10
+    
+          
+      - name: Setup environment for testing purpose
+        id: setup-environment
         run: |
-              IP_ADDRESS=$(docker network inspect -f '{{range.IPAM.Config}}{{.Gateway}}{{end}}' history4feed-action_default)
-              echo "ip_address=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
-              echo "IP_ADDRESS=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
-              echo "SERVICE_BASE_URL=http://$IP_ADDRESS:8002/" >> "$GITHUB_OUTPUT"
-              cat "$GITHUB_OUTPUT"
-      
-      - name: run unit tests with pytest+coverage
-        id: test-endpoints
-        run: |
-          pip install -e .[test]
-          set -a; source .env; source tests/tests.env; set +a
-          export DJANGO_WWW_PATH=$PWD/django_www_path/
-          mkdir -p $DJANGO_WWW_PATH
-          export POSTGRES_HOST="${{ steps.get_ip.outputs.IP_ADDRESS }}"
-          export PYTHONPATH=.
 
-          pytest --cov --cov-branch --cov-report=xml --junitxml=junit.xml -o junit_family=legacy tests/src
+            IP_ADDRESS=$(docker network inspect -f '{{range.IPAM.Config}}{{.Gateway}}{{end}}' h4f-action_default)
+            echo POSTGRES_HOST="$IP_ADDRESS" >> tests/tests.env
+            echo ARANGODB_HOST_URL="http://$IP_ADDRESS:18529" >> tests/tests.env
+
+            pip install -e '.[test]'
+
+
+      - name: test all
+        id: test-all
+        run: |
+          set -a; source tests/tests.env; set +a
+
+          pytest --cov --cov-branch --cov-report=xml --junitxml=unittest.junit.xml -o junit_family=legacy tests/ --ignore=tests/st/
+
+       
+      - name: test schema
+        if: ${{ failure() || success() }}
+        run: |
+          set -a; source tests/tests.env; set +a
+          pytest --cov --cov-branch --cov-append --cov-report=xml --junitxml=schemathesis.junit.xml -o junit_family=legacy tests/st/
+
 
       - name: Upload coverage reports to Codecov
         if: ${{ !cancelled() }}
@@ -82,12 +75,15 @@ jobs:
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: unittest.junit.xml
+          flags: unittest
 
-      - name: run schemathesis
-        uses: schemathesis/action@v1
-        if: always()
+      
+      - name: Upload schemathesis test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
         with:
-          schema: ${{ steps.get_ip.outputs.SERVICE_BASE_URL }}/api/schema/
-          checks: all
-          wait-for-schema: '30'
-          args: '--generation-allow-x00 false -H "Host: localhost"'
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: schemathesis.junit.xml
+          flags: schemathesis
+  

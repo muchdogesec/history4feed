@@ -1,7 +1,6 @@
 import pytest
 from rest_framework import status
-from history4feed.app.models import Post, Feed, Job
-from datetime import datetime as dt
+from history4feed.app.models import Job
 from unittest.mock import patch
 from history4feed.app.serializers import PostWithFeedIDSerializer
 from history4feed.app.views import PostOnlyView
@@ -9,16 +8,16 @@ from dateutil.parser import parse as parse_date
 
 
 from history4feed.app.utils import (
-    DatetimeFieldUTC,
     Ordering,
     Pagination,
     MinMaxDateFilter,
 )
+from dogesec_commons.utils.filters import DatetimeFieldUTC
 
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
 from history4feed.app.serializers import PostWithFeedIDSerializer
-from history4feed.app.models import Post, Feed, Job
+from history4feed.app.models import Job
 from rest_framework import (
     status,
 )
@@ -37,9 +36,8 @@ from django_filters.rest_framework import (
     ]
 )
 @pytest.mark.django_db
-def test_partial_update_post(client, data):
-    feed = Feed.objects.create(title="test feed", url="https://example.com/")
-    post = Post.objects.create(feed=feed, title="Old title", pubdate=dt.now())
+def test_partial_update_post(client, data, feed_posts):
+    _, (post, _) = feed_posts
 
     url = f"/api/v1/posts/{post.id}/"
 
@@ -58,9 +56,8 @@ def test_partial_update_post(client, data):
 
 
 @pytest.mark.django_db
-def test_destroy_post(client):
-    feed = Feed.objects.create(title="feed destroy test", url="https://example.com/")
-    post = Post.objects.create(feed=feed, title="to be deleted", pubdate=dt.now())
+def test_destroy_post(client, feed_posts):
+    _, (post, _) = feed_posts
 
     url = f"/api/v1/posts/{post.id}/"
 
@@ -77,9 +74,8 @@ def test_destroy_post(client):
 
 
 @pytest.mark.django_db
-def test_reindex_post(client):
-    feed = Feed.objects.create(title="Reindex Test Feed", url="https://example.com/")
-    post = Post.objects.create(feed=feed, title="Reindex Me", pubdate=dt.now())
+def test_reindex_post(client, feed_posts):
+    feed, (post, _) = feed_posts
 
     mock_job = Job.objects.create(state="pending", feed=feed)
 
@@ -100,16 +96,7 @@ def test_reindex_post(client):
 
 
 @pytest.mark.django_db
-def test_list_posts(client):
-    feed = Feed.objects.create(title="list test feed", url="https://example.com/")
-    Post.objects.create(feed=feed, title="First post", pubdate=dt.now())
-    Post.objects.create(
-        feed=feed,
-        title="Second post",
-        pubdate=dt.now(),
-        link="https://example.net/post2",
-    )
-
+def test_list_posts(client, feed_posts):
     with patch(
         "history4feed.app.views.PostOnlyView.filter_queryset", side_effect=lambda qs: qs
     ) as mock_filter:
@@ -123,9 +110,8 @@ def test_list_posts(client):
 
 
 @pytest.mark.django_db
-def test_retrieve_post(client):
-    feed = Feed.objects.create(title="retrieve feed", url="https://example.com/")
-    post = Post.objects.create(feed=feed, title="Single Post", pubdate=dt.now())
+def test_retrieve_post(client, feed_posts):
+    _, (post, _) = feed_posts
 
     url = f"/api/v1/posts/{post.id}/"
     response = client.get(url)
