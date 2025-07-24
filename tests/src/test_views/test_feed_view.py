@@ -5,25 +5,19 @@ import pytest
 from history4feed.app.models import Feed, FeedType, Job
 from history4feed.app.views import FeedView
 import pytest
-from rest_framework import status
 from django.http import HttpRequest
 from rest_framework.request import Request
-from history4feed.app.models import Post, Feed, Job
-from datetime import datetime as dt
+from history4feed.app.models import Feed, Job
 from unittest.mock import patch
 from history4feed.app.serializers import (
     FeedFetchSerializer,
     FeedPatchSerializer,
     FeedSerializer,
-    PostWithFeedIDSerializer,
     SearchIndexFeedSerializer,
 )
-from history4feed.app.views import PostOnlyView
-from dateutil.parser import parse as parse_date
 
 
 from history4feed.app.utils import (
-    DatetimeFieldUTC,
     Ordering,
     Pagination,
     MinMaxDateFilter,
@@ -31,11 +25,7 @@ from history4feed.app.utils import (
 
 # from .openapi_params import FEED_PARAMS, POST_PARAMS
 
-from history4feed.app.serializers import PostWithFeedIDSerializer
-from history4feed.app.models import Post, Feed, Job
-from rest_framework import (
-    status,
-)
+from history4feed.app.models import Feed, Job
 from django_filters.rest_framework import (
     DjangoFilterBackend,
 )
@@ -150,8 +140,7 @@ def test_create_skeleton_400(client):
     ],
 )
 @pytest.mark.django_db
-def test_feed_metadata_update(client, payload):
-    feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
+def test_feed_metadata_update(client, feed, payload):
     with patch(
         "history4feed.app.views.FeedPatchSerializer",
         side_effect=FeedPatchSerializer,
@@ -170,7 +159,6 @@ def test_feed_metadata_update(client, payload):
 
 @pytest.mark.django_db
 def test_fetch_feed(client):
-
     feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
     job = Job.objects.create(feed=feed)
     with patch.object(FeedView, "new_fetch_job") as mock_fetch_job:
@@ -184,11 +172,8 @@ def test_fetch_feed(client):
 
 
 @pytest.mark.django_db
-def test_new_fetch_job():
+def test_new_fetch_job(feed):
     request = Request(HttpRequest())
-    feed = Feed.objects.create(
-        url="https://example.com/rss.xml", title="Test Feed", feed_type="atom"
-    )
     view = FeedView()
     view.request = request
     view.kwargs = dict(feed_id=feed.id)
@@ -203,6 +188,7 @@ def test_new_fetch_job():
         ) as mock_fetch_feed_serializer,
     ):
         result = view.new_fetch_job(request)
+        assert feed.pk == result.feed.pk
         assert result.feed == feed
         mock_new_job.assert_called_once_with(result.feed, False)
         mock_fetch_feed_serializer.assert_called_once_with(
@@ -221,26 +207,7 @@ def test_new_fetch_job():
     ],
 )
 @pytest.mark.django_db
-def test_list_feed(client, filters, expected):
-    feeds = [
-        Feed.objects.create(
-            url="https://example.com/rss1.xml",
-            title="Test Feed 1",
-            feed_type="atom",
-            description="some description",
-        ),
-        Feed.objects.create(
-            url="https://example.com/rss2.xml",
-            title="Test Feed 2",
-            feed_type="rss",
-            description="descr-iption",
-        ),
-        Feed.objects.create(
-            url="https://example.com/rss3.xml",
-            title="Some other feed 3",
-            feed_type="skeleton",
-        ),
-    ]
+def test_list_feed(client, feeds, filters, expected):
     expected_ids = {str(feeds[i].id) for i in expected}
     resp = client.get("/api/v1/feeds/", query_params=filters)
     assert resp.status_code == 200
@@ -249,13 +216,7 @@ def test_list_feed(client, filters, expected):
 
 
 @pytest.mark.django_db
-def test_retrieve(client):
-    feed = Feed.objects.create(
-        url="https://example.com/rss1.xml",
-        title="Test Feed 1",
-        feed_type="atom",
-        description="some description",
-    )
+def test_retrieve(client, feed):
     another_uuid = uuid.uuid4()
     resp = client.get(f"/api/v1/feeds/{feed.id}/")
     assert resp.status_code == 200

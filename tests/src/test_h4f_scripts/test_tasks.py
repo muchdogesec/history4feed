@@ -81,17 +81,8 @@ def test_job_queue_fail():
 
 
 @pytest.mark.django_db
-def test_new_patch_posts_job():
-    feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
-    posts = [
-        Post.objects.create(feed=feed, title="First post", pubdate=dt.now()),
-        Post.objects.create(
-            feed=feed,
-            title="Second post",
-            pubdate=dt.now(),
-            link="https://example.net/post2",
-        ),
-    ]
+def test_new_patch_posts_job(feed_posts):
+    feed, posts = feed_posts
 
     with (
         patch(
@@ -283,25 +274,12 @@ def test_retrieve_posts_from_links(feed_type):
 
 
 @pytest.mark.django_db
-def test_create_fulltexts_task_chain():
+def test_create_fulltexts_task_chain(feed_posts):
+    feed, posts = feed_posts
     job_obj = models.Job.objects.create(
-        feed=Feed.objects.create(
-            url="https://example.com/rss.xml",
-            title="Test Feed",
-            feed_type=models.FeedType.RSS,
-        ),
+        feed=feed,
         state=models.JobState.PENDING,
     )
-    feed = job_obj.feed
-    posts = [
-        Post.objects.create(feed=feed, title="First post", pubdate=dt.now()),
-        Post.objects.create(
-            feed=feed,
-            title="Second post",
-            pubdate=dt.now(),
-            link="https://example.net/post2",
-        ),
-    ]
 
     with (
         patch(
@@ -322,7 +300,7 @@ def test_retrieve_posts_from_serper():
             url="https://example.com/rss.xml",
             title="Test Feed",
             feed_type=models.FeedType.SEARCH_INDEX,
-            freshness=dt(2024, 1, 1),
+            freshness=dt(2024, 1, 1, tzinfo=UTC),
         ),
         state=models.JobState.PENDING,
     )
@@ -335,22 +313,22 @@ def test_retrieve_posts_from_serper():
                     PostDict(
                         title="random title",
                         link="https://example.com/post/1",
-                        pubdate=dt.now(),
+                        pubdate=dt.now(UTC),
                     ),
                     PostDict(
                         title="random title",
                         link="https://example.com/post/2",
-                        pubdate=dt.now()
+                        pubdate=dt.now(UTC)
                     ),
                     PostDict(
                         title="random title",
                         link="https://example.com/post/3",
-                        pubdate=dt.now()
+                        pubdate=dt.now(UTC)
                     ),
                     PostDict(
                         title="random title",
                         link="https://example.com/post/4",
-                        pubdate=dt.now()
+                        pubdate=dt.now(UTC)
                     ),
                 ]
             },

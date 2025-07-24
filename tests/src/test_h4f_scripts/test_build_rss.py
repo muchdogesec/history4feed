@@ -2,7 +2,7 @@ from unittest.mock import call, patch
 
 import pytest
 from history4feed.app.models import Feed, Post
-from datetime import datetime as dt
+from datetime import UTC, datetime as dt
 
 from history4feed.h4fscripts.build_rss import build_entry_element, build_rss
 
@@ -14,20 +14,20 @@ def test_create_rss():
         Post.objects.create(
             feed=feed,
             title="First post",
-            pubdate=dt.now(),
+            pubdate=dt.now(UTC),
             link="http://example.com/post/1/",
         ),
         Post.objects.create(
             feed=feed,
             title="First post 2",
-            pubdate=dt.now(),
+            pubdate=dt.now(UTC),
             link="http://example.com/post/3/",
             author="some author",
         ),
         Post.objects.create(
             feed=feed,
             title="Second post",
-            pubdate=dt.now(),
+            pubdate=dt.now(UTC),
             link="https://example.net/post2",
         ),
 
@@ -35,7 +35,7 @@ def test_create_rss():
             feed=feed,
             title="Third post with description",
             description="The description",
-            pubdate=dt.now(),
+            pubdate=dt.now(UTC),
             link="http://example.com/post/6/",
         ),
     ]

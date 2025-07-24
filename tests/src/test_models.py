@@ -2,7 +2,6 @@
 
 from unittest.mock import patch
 import uuid
-from django.core import validators
 import pytest
 from history4feed.app import models
 from history4feed.app.settings import history4feed_server_settings

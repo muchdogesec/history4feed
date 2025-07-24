@@ -43,14 +43,11 @@ dependencies = [
 Homepage = "https://github.com/muchdogesec/history4feed"
 Issues = "https://github.com/muchdogesec/history4feed/issues"
 
-
-[tool.hatch.metadata]
-allow-direct-references = true
-
 [project.optional-dependencies]
 test = [
   "pytest",
   "pytest-subtests",
   "pytest-cov",
   "pytest-django",
+  "schemathesis",
 ]
