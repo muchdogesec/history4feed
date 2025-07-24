@@ -67,12 +67,11 @@ def start_post_job(self: CeleryTask, job_id):
     job = models.Job.objects.get(pk=job_id)
     if job.is_cancelled():
         job.info = "job cancelled while in queue"
-        job.save()
+        job.save(update_fields=['info'])
         return False
     if not queue_lock(job.feed, job):
         return self.retry(max_retries=360)
     job.update_state(models.JobState.RUNNING)
-    job.save()
     return True
 
 @shared_task
@@ -80,7 +79,6 @@ def start_job(job_id):
     job = models.Job.objects.get(pk=job_id)
     feed = job.feed
     job.update_state(models.JobState.RUNNING)
-    job.save()
     try:
         if feed.feed_type == models.FeedType.SEARCH_INDEX:
             return [feed.url]
@@ -88,7 +86,7 @@ def start_job(job_id):
     except BaseException as e:
         job.update_state(models.JobState.FAILED)
         job.info = str(e)
-        job.save()
+        job.save(update_fields=['info'])
         return []
 
 @shared_task(bind=True, default_retry_delay=10)
@@ -168,7 +166,6 @@ def collect_and_schedule_removal(sender, job_id):
     remove_lock(job)
     if job.state == models.JobState.RUNNING:
         job.update_state(models.JobState.SUCCESS)
-        job.save()
 
 def remove_lock(job):
     if cache.delete(get_lock_id(job.feed)):
@@ -267,7 +264,7 @@ def error_handler(request, exc: Exception, traceback, job_id):
     job = models.Job.objects.get(pk=job_id)
     job.update_state(models.JobState.FAILED)
     job.info = f"job failed: {exc}"
-    job.save()
+    job.save(update_fields=['info'])
     remove_lock(job)
     logger.error('Job {3} with task_id {0} raised exception: {1!r}\n{2!r}'.format(
           request.id, exc, traceback, job_id))
