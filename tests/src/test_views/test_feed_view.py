@@ -30,6 +30,9 @@ from django_filters.rest_framework import (
     DjangoFilterBackend,
 )
 
+from tests.conftest import api_schema
+from tests.utils import Transport
+
 
 def test_class_variables():
     assert FeedView.ordering_fields == [
@@ -52,7 +55,7 @@ def test_class_variables():
 
 
 @pytest.mark.django_db
-def test_create_feed(client):
+def test_create_feed(client, api_schema):
 
     feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
     job = Job.objects.create(feed=feed)
@@ -64,6 +67,7 @@ def test_create_feed(client):
         )
         assert resp.status_code == 201
         assert str(resp.data["job_id"]) == str(job.id)
+        api_schema['/api/v1/feeds/']['POST'].validate_response(Transport.get_st_response(resp))
 
 
 @pytest.mark.parametrize("include_remote_blogs", [True, False])
@@ -107,7 +111,7 @@ def test_new_create_job(use_search_index, include_remote_blogs):
 
 
 @pytest.mark.django_db
-def test_create_skeleton(client):
+def test_create_skeleton(client, api_schema):
     payload = dict(
         title="some title", description="some description", url="https://example.net/"
     )
@@ -118,16 +122,18 @@ def test_create_skeleton(client):
     assert resp.data["title"] == "some title"
     assert resp.data["description"] == "some description"
     assert resp.data["feed_type"] == "skeleton"
+    api_schema['/api/v1/feeds/skeleton/']['POST'].validate_response(Transport.get_st_response(resp))
 
 
 @pytest.mark.django_db
-def test_create_skeleton_400(client):
+def test_create_skeleton_400(client, api_schema):
     payload = dict(title="some title", description="some description")
     resp = client.post(
         "/api/v1/feeds/skeleton/", data=payload, content_type="application/json"
     )
     assert resp.status_code == 400, resp.content
 
+    api_schema['/api/v1/feeds/skeleton/']['POST'].validate_response(Transport.get_st_response(resp))
 
 @pytest.mark.parametrize(
     "payload",
@@ -140,7 +146,7 @@ def test_create_skeleton_400(client):
     ],
 )
 @pytest.mark.django_db
-def test_feed_metadata_update(client, feed, payload):
+def test_feed_metadata_update(client, feed, api_schema, payload):
     with patch(
         "history4feed.app.views.FeedPatchSerializer",
         side_effect=FeedPatchSerializer,
@@ -149,6 +155,7 @@ def test_feed_metadata_update(client, feed, payload):
             f"/api/v1/feeds/{feed.id}/", data=payload, content_type="application/json"
         )
         assert resp.status_code == 201, resp.content
+        api_schema['/api/v1/feeds/{feed_id}/']['PATCH'].validate_response(Transport.get_st_response(resp))
         mock_patch_feed_serializer.assert_called_once_with(
             feed, data=payload, partial=True
         )
@@ -158,7 +165,7 @@ def test_feed_metadata_update(client, feed, payload):
 
 
 @pytest.mark.django_db
-def test_fetch_feed(client):
+def test_fetch_feed(client, api_schema):
     feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
     job = Job.objects.create(feed=feed)
     with patch.object(FeedView, "new_fetch_job") as mock_fetch_job:
@@ -169,6 +176,7 @@ def test_fetch_feed(client):
         assert str(resp.data["job_id"]) == str(job.id)
         mock_fetch_job.assert_called_once()
         mock_fetch_job.call_args[0][0].path == url
+        api_schema['/api/v1/feeds/{feed_id}/fetch/']['PATCH'].validate_response(Transport.get_st_response(resp))
 
 
 @pytest.mark.django_db
@@ -207,20 +215,23 @@ def test_new_fetch_job(feed):
     ],
 )
 @pytest.mark.django_db
-def test_list_feed(client, feeds, filters, expected):
+def test_list_feed(client, api_schema, feeds, filters, expected):
     expected_ids = {str(feeds[i].id) for i in expected}
     resp = client.get("/api/v1/feeds/", query_params=filters)
     assert resp.status_code == 200
     assert len(resp.data["feeds"]) == len(expected_ids)
     assert {feed["id"] for feed in resp.data["feeds"]} == expected_ids
+    api_schema['/api/v1/feeds/']['GET'].validate_response(Transport.get_st_response(resp))
 
 
 @pytest.mark.django_db
-def test_retrieve(client, feed):
+def test_retrieve(client, feed, api_schema):
     another_uuid = uuid.uuid4()
     resp = client.get(f"/api/v1/feeds/{feed.id}/")
     assert resp.status_code == 200
     assert resp.data["id"] == str(feed.id)
+    api_schema['/api/v1/feeds/{feed_id}/']['GET'].validate_response(Transport.get_st_response(resp))
 
     resp = client.get(f"/api/v1/feeds/{another_uuid}/")
     assert resp.status_code == 404
+    api_schema['/api/v1/feeds/{feed_id}/']['GET'].validate_response(Transport.get_st_response(resp))
