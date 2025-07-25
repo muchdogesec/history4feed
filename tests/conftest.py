@@ -58,3 +58,11 @@ def jobs(feeds):
         Job.objects.create(feed=feeds[0], id="8ff3672d-067b-40af-9065-e801061f5593"),
         Job.objects.create(feed=feeds[1], id="e9794a6c-388e-4bd5-bf29-6bc01aebb8bb"),
     ]
+
+
+
+@pytest.fixture(scope='session')
+def api_schema():
+    import schemathesis
+    from history4feed.asgi import application
+    yield schemathesis.openapi.from_asgi("/api/schema/?format=json", application)

@@ -25,6 +25,8 @@ from django_filters.rest_framework import (
     DjangoFilterBackend,
 )
 
+from tests.utils import Transport
+
 
 @pytest.mark.parametrize(
     "data",
@@ -36,7 +38,7 @@ from django_filters.rest_framework import (
     ]
 )
 @pytest.mark.django_db
-def test_partial_update_post(client, data, feed_posts):
+def test_partial_update_post(client, data, feed_posts, api_schema):
     _, (post, _) = feed_posts
 
     url = f"/api/v1/posts/{post.id}/"
@@ -53,10 +55,12 @@ def test_partial_update_post(client, data, feed_posts):
         assert set([obj.name for obj in post.categories.all()]) == set(categories)
     if pubdate := data.get('pubdate'):
         assert post.pubdate == DatetimeFieldUTC().to_python(parse_date(pubdate))
+    api_schema['/api/v1/posts/{post_id}/']['PATCH'].validate_response(Transport.get_st_response(response))
+    
 
 
 @pytest.mark.django_db
-def test_destroy_post(client, feed_posts):
+def test_destroy_post(client, feed_posts, api_schema):
     _, (post, _) = feed_posts
 
     url = f"/api/v1/posts/{post.id}/"
@@ -71,10 +75,11 @@ def test_destroy_post(client, feed_posts):
     assert (
         response.status_code == status.HTTP_404_NOT_FOUND
     ), "should already be deleted"
+    api_schema['/api/v1/posts/{post_id}/']['DELETE'].validate_response(Transport.get_st_response(response))
 
 
 @pytest.mark.django_db
-def test_reindex_post(client, feed_posts):
+def test_reindex_post(client, feed_posts, api_schema):
     feed, (post, _) = feed_posts
 
     mock_job = Job.objects.create(state="pending", feed=feed)
@@ -93,10 +98,11 @@ def test_reindex_post(client, feed_posts):
         assert response.json()["feed_id"] == str(feed.id)
 
         mock_task.assert_called_once_with(feed, [post])
+        api_schema['/api/v1/posts/{post_id}/reindex/']['PATCH'].validate_response(Transport.get_st_response(response))
 
 
 @pytest.mark.django_db
-def test_list_posts(client, feed_posts):
+def test_list_posts(client, feed_posts, api_schema):
     with patch(
         "history4feed.app.views.PostOnlyView.filter_queryset", side_effect=lambda qs: qs
     ) as mock_filter:
@@ -107,10 +113,11 @@ def test_list_posts(client, feed_posts):
         assert response.status_code == status.HTTP_200_OK
         assert len(response.json()["posts"]) == 2  # Pagination applied
         mock_filter.assert_called_once()
+        api_schema['/api/v1/posts/']['GET'].validate_response(Transport.get_st_response(response))
 
 
 @pytest.mark.django_db
-def test_retrieve_post(client, feed_posts):
+def test_retrieve_post(client, feed_posts, api_schema):
     _, (post, _) = feed_posts
 
     url = f"/api/v1/posts/{post.id}/"
@@ -118,6 +125,8 @@ def test_retrieve_post(client, feed_posts):
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["id"] == str(post.id)
+    api_schema['/api/v1/posts/{post_id}/']['GET'].validate_response(Transport.get_st_response(response))
+
 
 
 def test_class_variables():
