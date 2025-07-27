@@ -20,9 +20,11 @@ from rest_framework import (
     status,
 )
 
+from tests.utils import Transport
+
 
 @pytest.mark.django_db
-def test_create_post_in_feed_success(client):
+def test_create_post_in_feed_success(client, api_schema):
     feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
     job = Job.objects.create(feed=feed)
 
@@ -50,6 +52,7 @@ def test_create_post_in_feed_success(client):
         assert resp.data["id"] == str(job.id)
         assert resp.data["feed_id"] == str(job.feed.id)
 
+        api_schema['/api/v1/feeds/{feed_id}/posts/']['POST'].validate_response(Transport.get_st_response(resp))
 
 @pytest.mark.django_db
 def test_new_create_post_job(feed):
@@ -73,7 +76,7 @@ def test_new_create_post_job(feed):
 
 
 @pytest.mark.django_db
-def test_reindex_feed(client, feed_posts):
+def test_reindex_feed(client, feed_posts, api_schema):
     feed, posts = feed_posts
     job = Job.objects.create(feed=feed)
     with (
@@ -89,4 +92,5 @@ def test_reindex_feed(client, feed_posts):
         mock_job_s_class.assert_called_once_with(job)
         assert resp.data["id"] == str(job.id)
         assert resp.data["feed_id"] == str(job.feed.id)
+        api_schema['/api/v1/feeds/{feed_id}/posts/reindex/']['PATCH'].validate_response(Transport.get_st_response(resp))
 
