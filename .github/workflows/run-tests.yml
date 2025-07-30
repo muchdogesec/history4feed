@@ -1,16 +1,18 @@
 name: Run Tests
 
+permissions:
+  contents: read
+  
 on:
   push:
     branches:
       - main
   pull_request:
-
-permissions:
-  contents: read
-
+    types:
+      - opened
+      - synchronize
 jobs:
-  run-tests:
+  test-pipeline:
     runs-on: ubuntu-latest
     environment: test_pipeline
     
@@ -25,9 +27,9 @@ jobs:
         with:
           python-version: "3.11"
 
-               
       - name: Start docker-compose
         uses: hoverkraft-tech/compose-action@v2.0.2
+        id: start_container
         with:
           compose-file: tests/docker-compose.yml
           compose-flags:
@@ -35,42 +37,40 @@ jobs:
             -p h4f-action
 
       - name: Wait for container to start
+        id: wait_for_container_to_start
         run: sleep 10
-    
-          
-      - name: Setup environment for testing purpose
-        id: setup-environment
+   
+      - name: Setup environment
+        id: setup_environment
         run: |
 
             IP_ADDRESS=$(docker network inspect -f '{{range.IPAM.Config}}{{.Gateway}}{{end}}' h4f-action_default)
             echo POSTGRES_HOST="$IP_ADDRESS" >> tests/tests.env
             echo ARANGODB_HOST_URL="http://$IP_ADDRESS:18529" >> tests/tests.env
-
             pip install -e '.[test]'
 
-
-      - name: test all
-        id: test-all
+      - name: Unit tests
+        id: unit_tests
         run: |
           set -a; source tests/tests.env; set +a
-
           pytest --cov --cov-branch --cov-report=xml --junitxml=unittest.junit.xml -o junit_family=legacy tests/ --ignore=tests/st/
 
-       
-      - name: test schema
+      - name: Schema tests
+        id: schema_tests
         if: ${{ failure() || success() }}
         run: |
           set -a; source tests/tests.env; set +a
           pytest --cov --cov-branch --cov-append --cov-report=xml --junitxml=schemathesis.junit.xml -o junit_family=legacy tests/st/
 
-
       - name: Upload coverage reports to Codecov
+        id: upload_unit_test_coverage
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload test results to Codecov
+        id: upload_unit_test_results
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
@@ -78,12 +78,11 @@ jobs:
           files: unittest.junit.xml
           flags: unittest
 
-      
       - name: Upload schemathesis test results to Codecov
+        id: upload_schema_test_results
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: schemathesis.junit.xml
           flags: schemathesis
-  
