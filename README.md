@@ -2,6 +2,12 @@
 
 [![codecov](https://codecov.io/gh/muchdogesec/history4feed/graph/badge.svg?token=3Z5LELB8OP)](https://codecov.io/gh/muchdogesec/history4feed)
 
+## Before you begin...
+
+![](docs/obstracts.png)
+
+We use history4feed in the web version of Obstracts which includes many additional features over those in this codebase. [You can find out more about the web version here](https://www.obstracts.com/).
+
 ## Overview
 
 ![](docs/history4feed.png)
@@ -20,12 +26,6 @@ history4feed offers an API interface that;
 4. downloads a HTML version of the article content on each page
 5. stores the post record in the databases
 6. exposes the posts as JSON or XML RSS
-
-## tl;dr
-
-[![history4feed](https://img.youtube.com/vi/z1ATbiecbg4/0.jpg)](https://www.youtube.com/watch?v=z1ATbiecbg4)
-
-[Watch the demo](https://www.youtube.com/watch?v=z1ATbiecbg4).
 
 ## Install
 
