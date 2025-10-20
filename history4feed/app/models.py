@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 import re
 from textwrap import dedent
 from typing import Iterable
@@ -107,6 +108,7 @@ class Job(models.Model):
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
     info = models.CharField(max_length=FEED_DESCRIPTION_MAX_LENGTH, help_text="contains a useful summary of the job (e.g. number of posts retrieved, errors logged)")
     include_remote_blogs = models.BooleanField(default=False)
+    completion_time = models.DateTimeField(default=None, null=True)
 
     def urls(self):
         retval = {}
@@ -130,6 +132,8 @@ class Job(models.Model):
     @transaction.atomic
     def update_state(self, state):
         obj = self.__class__.objects.select_for_update().get(pk=self.pk)
+        if state in [JobState.CANCELLED, JobState.FAILED, JobState.SUCCESS]:
+            obj.completion_time = datetime.now(UTC)
         if obj.state not in [JobState.PENDING, JobState.RUNNING]:
             return obj.state
         obj.state = state

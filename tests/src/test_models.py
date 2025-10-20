@@ -4,6 +4,7 @@ from unittest.mock import patch
 import uuid
 import pytest
 from history4feed.app import models
+from history4feed.app.models import JobState
 from history4feed.app.settings import history4feed_server_settings
 from rest_framework.validators import ValidationError
 
@@ -42,3 +43,33 @@ def test_feed_get_pretty_url():
     assert feed.get_pretty_url() == feed.url
     feed.pretty_url = 'https://example.net/pretty-url/'
     assert feed.get_pretty_url() == feed.pretty_url
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "original_state, new_state, expected_state, has_completion_time",
+    [
+        (JobState.PENDING, JobState.CANCELLED, JobState.CANCELLED, True),
+        (JobState.PENDING, JobState.FAILED, JobState.FAILED, True),
+        (JobState.PENDING, JobState.SUCCESS, JobState.SUCCESS, True),
+        (JobState.RUNNING, JobState.SUCCESS, JobState.SUCCESS, True),
+        (JobState.SUCCESS, JobState.FAILED, JobState.SUCCESS, False),
+        (JobState.CANCELLED, JobState.SUCCESS, JobState.CANCELLED, False),
+        (JobState.FAILED, JobState.SUCCESS, JobState.FAILED, False),
+    ]
+)
+def test_update_state_behavior(jobs, original_state, new_state, expected_state, has_completion_time):
+    job = jobs[0]
+    job.state = original_state
+    job.save()
+    
+    result = job.update_state(new_state)
+    job.refresh_from_db()
+
+    assert job.state == expected_state
+    assert result == expected_state
+
+    if has_completion_time:
+        assert job.completion_time is not None
+    else:
+        assert job.completion_time is None
