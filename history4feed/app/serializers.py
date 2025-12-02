@@ -96,8 +96,8 @@ class PostSerializer(serializers.ModelSerializer):
         
     
     def run_validation(self, data=...):
-        if categories := data.get('categories'):
-            data['categories'] = [Category.objects.get_or_create(name=name)[0].name for name in categories]
+        if isinstance(data, dict) and isinstance(data.get('categories'), list):
+            data['categories'] = [Category.objects.get_or_create(name=name)[0].name for name in data["categories"]]
         return super().run_validation(data)
     
 class PostWithFeedIDSerializer(PostSerializer):
@@ -112,7 +112,7 @@ class FeedPatchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Feed
-        fields = ['title', 'description', 'pretty_url']
+        fields = ['title', 'description', 'pretty_url', 'source_category']
 
 class FeedFetchSerializer(FeedPatchSerializer, FeedSerializer):
     class Meta:
