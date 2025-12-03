@@ -299,6 +299,8 @@ class FeedView(viewsets.ModelViewSet):
             help_text="Filter by `feed_type`",
             choices=FeedType.choices,
         )
+        source_category = Filter(help_text="Filter by the source category of a feed")
+
 
 
     def get_queryset(self):
@@ -318,6 +320,7 @@ class FeedView(viewsets.ModelViewSet):
             * `title` (optional): the title of the feed will be used if not passed. You can also manually pass the title of the blog here.
             * `description` (optional): the description of the feed will be used if not passed. You can also manually pass the description of the blog here.
             * `use_search_index` (optional, default is `false`): If the `url` is not a valid RSS or ATOM feed you must set this mode to `true`. Set to `true` this mode uses search results that contain the base `url` passed vs. the RSS/ATOM feed entries (when this mode is set to `false`). This mode is only be able to index results in Google Search, so can miss some sites entirely where they are not indexed by Google. You must also pass a `title` and `description` when setting this mode to `true`. Note, you can use the skeleton endpoint to create a feed manually from a non RSS/ATOM URL or where search results do not satisfy your use case.
+            * `source_category` (optional, default is `uncategorized`, list): can be used to categories the feed. Options available are: `analyst`, `community`, `government`, `media`, or `vendor`.
 
             The `id` of a Feed is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` and the value used is `<FEED_URL>` (e.g. `https://muchdogesec.github.io/fakeblog123/feeds/rss-feed-encoded.xml` would have the id `d1d96b71-c687-50db-9d2b-d0092d1d163a`). Therefore, you cannot add a URL that already exists, you must first delete it to add it with new settings.
 
@@ -414,6 +417,7 @@ class FeedView(viewsets.ModelViewSet):
             * `title` (optional): update the `title` of the Feed
             * `description` (optional): update the `description` of the Feed
             * `pretty_url` (optional): update the `pretty_url of the Feed
+            * `source_category` (optional, default is `uncategorized`, list): can be used to categories the feed. Options available are: `analyst`, `community`, `government`, `media`, or `vendor`.
 
             Only one/key value is required in the request. For those not passed, the current value will remain unchanged.
 

@@ -1,59 +1,40 @@
 services:
-    django:
-        image: history4feed
-        build: .
+    env_django:
+        image: vulmatch
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
         command: >
                 bash -c "
                     python manage.py collectstatic --no-input &&
                         python manage.py makemigrations &&
-                                python manage.py migrate &&
-                                    gunicorn history4feed.wsgi:application --bind 0.0.0.0:8002 --reload
-                        "
-        volumes:
-            - .:/usr/src/app/
-        ports:
-            - 8002:8002
-        environment:
-            - DEBUG=1
-            - CELERY_BROKER_URL=redis://redis:6379/0
-        env_file:
-            - ./.env
-        depends_on:
-            pgdb:
-                condition: service_healthy
-            redis:
-                condition: service_started
-    celery:
-        image: history4feed
-        build: .
-        command: >
-                bash -c "
-                  celery -A history4feed.h4fscripts worker -l INFO
-                  "
+                                python manage.py migrate
+                    "
         volumes:
             - .:/usr/src/app
         environment:
             - DEBUG=1
             - CELERY_BROKER_URL=redis://redis:6379/0
             - result_backend=redis://redis:6379/1
+        build: .
         env_file:
             - ./.env
+    django:
+        image: history4feed
+        extends: env_django
+        command: gunicorn history4feed.wsgi:application --bind 0.0.0.0:8002 --reload
+        volumes:
+            - .:/usr/src/app/
+        ports:
+            - 8002:8002
+        depends_on:
+            redis:
+                condition: service_started
+    celery:
+        image: history4feed
+        extends: env_django
+        command: celery -A history4feed.h4fscripts worker -l INFO
         depends_on:
             - django
             - redis
-    pgdb:
-        image: postgres
-        env_file:
-          - ./.env
-        volumes:
-            - pgdata:/var/lib/postgresql/data/
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-            interval: 10s
-            retries: 5
-            start_period: 30s
-            timeout: 10s
     redis:
         image: "redis:alpine"
-volumes:
-    pgdata:
