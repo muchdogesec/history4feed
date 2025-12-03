@@ -299,6 +299,8 @@ class FeedView(viewsets.ModelViewSet):
             help_text="Filter by `feed_type`",
             choices=FeedType.choices,
         )
+        source_category = Filter(help_text="Filter by the source category of a feed")
+
 
 
     def get_queryset(self):
