@@ -657,7 +657,7 @@ class feed_post_view(
 
     def new_create_post_job(self, request, feed_id):
         feed_obj = get_object_or_404(Feed, id=feed_id)
-        data = dict(request.data) #, feed_id=feed_id, feed=feed_id)
+        data = request.data
 
         s = CreatePostsSerializer(data=data, context=dict(feed_id=feed_id))
         s.is_valid(raise_exception=True)
