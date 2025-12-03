@@ -15,14 +15,8 @@ services:
             - 8002:8002
         environment:
             - DEBUG=1
-            - CELERY_BROKER_URL=redis://redis:6379/0
         env_file:
             - ./.env
-        depends_on:
-            pgdb:
-                condition: service_healthy
-            redis:
-                condition: service_started
     celery:
         image: history4feed
         build: .
@@ -34,26 +28,7 @@ services:
             - .:/usr/src/app
         environment:
             - DEBUG=1
-            - CELERY_BROKER_URL=redis://redis:6379/0
-            - result_backend=redis://redis:6379/1
         env_file:
             - ./.env
         depends_on:
             - django
-            - redis
-    pgdb:
-        image: postgres
-        env_file:
-          - ./.env
-        volumes:
-            - pgdata:/var/lib/postgresql/data/
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-            interval: 10s
-            retries: 5
-            start_period: 30s
-            timeout: 10s
-    redis:
-        image: "redis:alpine"
-volumes:
-    pgdata:
