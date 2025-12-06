@@ -162,7 +162,7 @@ tzlocal==5.3.1
     # via dateparser
 uritemplate==4.2.0
     # via drf-spectacular
-urllib3==2.5.0
+urllib3==2.6.0
     # via
     #   python-arango
     #   requests
