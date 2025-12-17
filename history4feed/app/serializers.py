@@ -115,9 +115,10 @@ class FeedPatchSerializer(serializers.ModelSerializer):
         fields = ['title', 'description', 'pretty_url', 'source_category']
 
 class FeedFetchSerializer(FeedPatchSerializer, FeedSerializer):
+    force_full_fetch = serializers.BooleanField(write_only=True, default=False, help_text="If true, will re-fetch all items from the earliest search date instead of from the latest known item date.")
     class Meta:
         model = Feed
-        fields = ['include_remote_blogs']
+        fields = ['include_remote_blogs', 'force_full_fetch']
 
 class PostCreateSerializer(PostSerializer):
     link = serializers.URLField(validators=[normalize_url])
@@ -164,9 +165,10 @@ class JobUrlStatusSerializer(serializers.Serializer):
         id = serializers.UUIDField()
     retrieved = joburlstatus(many=True, default=[])
     retrieving = joburlstatus(many=True, default=[])
-    skipped = joburlstatus(many=True, default=[])
-    failed = joburlstatus(many=True, default=[])
+    skipped   = joburlstatus(many=True, default=[])
+    failed    = joburlstatus(many=True, default=[])
     cancelled = joburlstatus(many=True, default=[])
+    timed_out = joburlstatus(many=True, default=[])
 
 class JobSerializer(serializers.ModelSerializer):
     count_of_items = serializers.IntegerField(read_only=True)

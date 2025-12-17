@@ -483,7 +483,7 @@ class FeedView(viewsets.ModelViewSet):
         s = FeedFetchSerializer(feed_obj, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
         s.save()
-        return task_helper.new_job(feed_obj, s.validated_data.get('include_remote_blogs', False))
+        return task_helper.new_job(feed_obj, s.validated_data.get('include_remote_blogs', False), force_full_fetch=s.validated_data['force_full_fetch'])
 
     @extend_schema(
         summary="Search for Feeds",
@@ -695,9 +695,12 @@ class feed_post_view(
         job_resp = JobSerializer(job_obj).data.copy()
         # job_resp.update(post_id=post.id)
         return Response(job_resp, status=status.HTTP_201_CREATED)
+    
+    def reindex_queryset(self):
+        return self.get_queryset().all()
 
     def new_reindex_feed_job(self, feed_id):
-        posts = self.get_queryset().all()
+        posts = self.reindex_queryset()
         feed_obj = get_object_or_404(Feed, id=feed_id)
         job_obj = task_helper.new_patch_posts_job(feed_obj, tuple(posts))
         return job_obj

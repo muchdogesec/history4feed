@@ -17,6 +17,7 @@ from history4feed.h4fscripts.task_helper import (
     retrieve_posts_from_links,
     retrieve_posts_from_serper,
     retrieve_posts_from_url,
+    revoke_cancelled_job,
     start_job,
     start_post_job,
 )
@@ -44,9 +45,6 @@ def test_new_job():
         ) as mock_retrieve_posts,
         patch("history4feed.h4fscripts.task_helper.start_job.run") as mock_start_job,
         patch(
-            "history4feed.h4fscripts.task_helper.collect_and_schedule_removal.run"
-        ) as mock_collect_and_schedule_removal,
-        patch(
             "history4feed.h4fscripts.task_helper.error_handler.run"
         ) as mock_error_handler,
         patch(
@@ -59,8 +57,111 @@ def test_new_job():
         mock_queue_lock.assert_called_once_with(feed, job)
         mock_retrieve_posts.assert_called_once_with(mock_start_job.return_value, job.id)
         mock_start_job.assert_called_once_with(job.id)
-        mock_collect_and_schedule_removal.assert_called_once_with(job.id)
         mock_error_handler.assert_not_called(), "should not be called unless there is an error"
+
+
+@pytest.mark.django_db
+def test_new_job_with_force_full_fetch():
+    from history4feed.app.settings import history4feed_server_settings as settings
+    feed = Feed.objects.create(
+        url="https://example.com/rss.xml", 
+        title="Test Feed",
+        latest_item_pubdate=dt(2024, 6, 1, tzinfo=UTC)
+    )
+
+    with (
+        patch(
+            "history4feed.h4fscripts.task_helper.retrieve_posts_from_links.run"
+        ) as mock_retrieve_posts,
+        patch("history4feed.h4fscripts.task_helper.start_job.run") as mock_start_job,
+        patch(
+            "history4feed.h4fscripts.task_helper.queue_lock", return_value=True
+        ) as mock_queue_lock,
+    ):
+        new_job(feed, include_remote_blogs=False, force_full_fetch=True)
+        job: Job = mock_queue_lock.call_args[0][1]
+        assert job.feed == feed
+        assert job.earliest_item_requested == settings.EARLIEST_SEARCH_DATE
+        mock_queue_lock.assert_called_once_with(feed, job)
+
+
+@pytest.mark.django_db
+def test_new_job_without_force_full_fetch():
+    from history4feed.app.settings import history4feed_server_settings as settings
+    latest_pubdate = dt(2024, 6, 1, tzinfo=UTC)
+    feed = Feed.objects.create(
+        url="https://example.com/rss.xml", 
+        title="Test Feed",
+    )
+    # Manually set latest_item_pubdate after creation to simulate existing data
+    Feed.objects.filter(pk=feed.pk).update(latest_item_pubdate=latest_pubdate)
+    feed.refresh_from_db()
+
+    with (
+        patch(
+            "history4feed.h4fscripts.task_helper.retrieve_posts_from_links.run"
+        ) as mock_retrieve_posts,
+        patch("history4feed.h4fscripts.task_helper.start_job.run") as mock_start_job,
+        patch(
+            "history4feed.h4fscripts.task_helper.queue_lock", return_value=True
+        ) as mock_queue_lock,
+    ):
+        new_job(feed, include_remote_blogs=False, force_full_fetch=False)
+        job: Job = mock_queue_lock.call_args[0][1]
+        assert job.feed == feed
+        assert job.earliest_item_requested == latest_pubdate
+        mock_queue_lock.assert_called_once_with(feed, job)
+
+
+@pytest.mark.django_db
+def test_new_job_full_fetch_without_latest_item_pubdate():
+    from history4feed.app.settings import history4feed_server_settings as settings
+    feed = Feed.objects.create(
+        url="https://example.com/rss.xml", 
+        title="Test Feed",
+        latest_item_pubdate=None
+    )
+
+    with (
+        patch(
+            "history4feed.h4fscripts.task_helper.retrieve_posts_from_links.run"
+        ) as mock_retrieve_posts,
+        patch("history4feed.h4fscripts.task_helper.start_job.run") as mock_start_job,
+        patch(
+            "history4feed.h4fscripts.task_helper.queue_lock", return_value=True
+        ) as mock_queue_lock,
+    ):
+        # When latest_item_pubdate is None, should use EARLIEST_SEARCH_DATE regardless
+        new_job(feed, include_remote_blogs=False, force_full_fetch=False)
+        job: Job = mock_queue_lock.call_args[0][1]
+        assert job.feed == feed
+        assert job.earliest_item_requested == settings.EARLIEST_SEARCH_DATE
+        mock_queue_lock.assert_called_once_with(feed, job)
+
+
+@pytest.mark.django_db
+def test_new_job_error_handler_called():
+    feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
+
+    with (
+        patch("history4feed.h4fscripts.task_helper.start_job.run", side_effect=Exception("Start job failed")) as mock_start_job,
+        patch(
+            "history4feed.h4fscripts.task_helper.error_handler.run"
+        ) as mock_error_handler,
+        patch(
+            "history4feed.h4fscripts.task_helper.queue_lock", return_value=True
+        ) as mock_queue_lock,
+        pytest.raises(Exception, match="Start job failed"),
+    ):
+        new_job(feed, include_remote_blogs=False)
+        
+    # After the exception, error_handler should have been called
+    job: Job = mock_queue_lock.call_args[0][1]
+    mock_error_handler.assert_called_once()
+    # error_handler is called with positional args: (request, exc, traceback, job_id)
+    call_args = mock_error_handler.call_args[0]
+    assert call_args[3] == job.id  # job_id is the 4th positional arg
+    assert 'Start job failed' in str(call_args[1])  # exc is the 2nd positional arg
 
 
 @pytest.mark.django_db
@@ -129,6 +230,28 @@ def test_start_post_job_already_cancelled():
         assert result.get() == False
         mock_queue_lock.assert_not_called()
 
+
+@pytest.mark.django_db
+def test_revoke_cancelled_job_success():
+    feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
+    job_obj = models.Job.objects.create(
+        feed=feed,
+        state=models.JobState.CANCELLED,
+    )
+    with (
+        patch("history4feed.h4fscripts.task_helper.collect_and_schedule_removal.si") as mock_cleanup,
+        patch.object(revoke_cancelled_job, 'replace') as mock_replace,
+        patch("history4feed.h4fscripts.celery.app.control.revoke_by_stamped_headers", return_value=['task1', 'task2']) as mock_revoke,
+    ):
+        revoke_cancelled_job.run(job_obj.id)
+        
+        mock_revoke.assert_called_once_with(
+            dict(job_id=str(job_obj.id)),
+            terminate=True,
+            signal='SIGTERM'
+        )
+        mock_replace.assert_called_once()
+        assert mock_replace.call_args[0][0] == mock_cleanup.return_value
 
 @pytest.mark.django_db
 def test_start_post_job_retries_until_queue_no_longer_locked():
@@ -237,9 +360,10 @@ def test_retrieve_posts_from_links(feed_type):
             "history4feed.h4fscripts.task_helper.create_fulltexts_task_chain",
             side_effect=chains,
         ) as mock_ft_chain,
+        patch("history4feed.h4fscripts.task_helper.celery.chord") as mock_chord,
+        patch.object(retrieve_posts_from_links, 'replace') as mock_replace,
     ):
-
-        resp = retrieve_posts_from_links(
+        retrieve_posts_from_links.run(
             ["https://goo.gl", "http://example.com"], job_obj.id
         )
         job_obj.refresh_from_db()
@@ -270,7 +394,11 @@ def test_retrieve_posts_from_links(feed_type):
             mock_ft_chain.assert_called_with(
                 job_obj.id, mock_retrieve_rss.return_value[1]
             )
-        assert resp == [chain.apply_async.return_value.id for chain in chains]
+        
+        mock_chord.assert_called_once()
+        args = mock_chord.call_args[0]
+        assert args[0] == chains
+        mock_replace.assert_called_once_with(mock_chord.return_value)
 
 
 @pytest.mark.django_db
@@ -515,5 +643,39 @@ def test_retrieve_full_text_exception(mock_get_job, mock_get_text, dummy_ftjob):
 
     assert dummy_ftjob.status == FullTextState.FAILED
     assert dummy_ftjob.error_str == "boom"
+    dummy_ftjob.save.assert_called_once()
+    dummy_ftjob.post.save.assert_called_once()
+
+
+@patch("history4feed.h4fscripts.task_helper.h4f.get_full_text")
+@patch("history4feed.h4fscripts.task_helper.models.FulltextJob.objects.get")
+def test_retrieve_full_text_soft_timeout(mock_get_job, mock_get_text, dummy_ftjob):
+    from celery.exceptions import SoftTimeLimitExceeded
+    mock_get_job.return_value = dummy_ftjob
+    dummy_ftjob.is_cancelled.return_value = False
+    mock_get_text.side_effect = SoftTimeLimitExceeded()
+
+    retrieve_full_text(dummy_ftjob.pk)
+
+    assert dummy_ftjob.status == FullTextState.TIMED_OUT
+    assert "timed out" in dummy_ftjob.error_str.lower()
+    assert "SoftTimeLimitExceeded" in dummy_ftjob.error_str
+    dummy_ftjob.save.assert_called_once()
+    dummy_ftjob.post.save.assert_called_once()
+
+
+@patch("history4feed.h4fscripts.task_helper.h4f.get_full_text")
+@patch("history4feed.h4fscripts.task_helper.models.FulltextJob.objects.get")
+def test_retrieve_full_text_hard_timeout(mock_get_job, mock_get_text, dummy_ftjob):
+    from celery.exceptions import TimeLimitExceeded
+    mock_get_job.return_value = dummy_ftjob
+    dummy_ftjob.is_cancelled.return_value = False
+    mock_get_text.side_effect = TimeLimitExceeded()
+
+    retrieve_full_text(dummy_ftjob.pk)
+
+    assert dummy_ftjob.status == FullTextState.TIMED_OUT
+    assert "timed out" in dummy_ftjob.error_str.lower()
+    assert "TimeLimitExceeded" in dummy_ftjob.error_str
     dummy_ftjob.save.assert_called_once()
     dummy_ftjob.post.save.assert_called_once()
