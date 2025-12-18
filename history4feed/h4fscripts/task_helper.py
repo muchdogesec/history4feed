@@ -71,16 +71,6 @@ def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_rem
     task.apply_async(link_error=error_handler.s(job_obj.pk), countdown=5)
     return job_obj
 
-@shared_task(bind=True)
-def revoke_cancelled_job(self, job_id):
-    job = models.Job.objects.get(pk=job_id)
-    from .celery import app
-    from celery.app.control import Control, Inspect
-    control: Control = app.control
-    revoked = control.revoke_by_stamped_headers(dict(job_id=str(job_id)), terminate=True, signal='SIGTERM')
-    print(f"sending termination signal to tasks belonging to job {job_id}: {revoked}")
-    return self.replace(collect_and_schedule_removal.si(job_id))
-
 @shared_task(bind=True, default_retry_delay=10)
 def start_post_job(self: CeleryTask, job_id):
     job = models.Job.objects.get(pk=job_id)

@@ -134,10 +134,7 @@ class Job(models.Model):
         return (not self.include_remote_blogs) and urlparse(self.feed.url).hostname.split('.')[-2:] != urlparse(post_link).hostname.split('.')[-2:]
     
     def cancel(self):
-        from history4feed.h4fscripts.task_helper import revoke_cancelled_job
         state = self.update_state(JobState.CANCELLED)
-        if state == JobState.CANCELLED:
-            revoke_cancelled_job.si(str(self.pk)).apply_async(countdown=history4feed_server_settings.CANCEL_TIMEOUT_SECONDS)
         self.save()
         return
     

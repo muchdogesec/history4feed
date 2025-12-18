@@ -17,7 +17,6 @@ from history4feed.h4fscripts.task_helper import (
     retrieve_posts_from_links,
     retrieve_posts_from_serper,
     retrieve_posts_from_url,
-    revoke_cancelled_job,
     start_job,
     start_post_job,
 )
@@ -229,29 +228,6 @@ def test_start_post_job_already_cancelled():
         result = start_post_job.si(job_obj.id).delay()
         assert result.get() == False
         mock_queue_lock.assert_not_called()
-
-
-@pytest.mark.django_db
-def test_revoke_cancelled_job_success():
-    feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
-    job_obj = models.Job.objects.create(
-        feed=feed,
-        state=models.JobState.CANCELLED,
-    )
-    with (
-        patch("history4feed.h4fscripts.task_helper.collect_and_schedule_removal.si") as mock_cleanup,
-        patch.object(revoke_cancelled_job, 'replace') as mock_replace,
-        patch("history4feed.h4fscripts.celery.app.control.revoke_by_stamped_headers", return_value=['task1', 'task2']) as mock_revoke,
-    ):
-        revoke_cancelled_job.run(job_obj.id)
-        
-        mock_revoke.assert_called_once_with(
-            dict(job_id=str(job_obj.id)),
-            terminate=True,
-            signal='SIGTERM'
-        )
-        mock_replace.assert_called_once()
-        assert mock_replace.call_args[0][0] == mock_cleanup.return_value
 
 @pytest.mark.django_db
 def test_start_post_job_retries_until_queue_no_longer_locked():
