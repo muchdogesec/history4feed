@@ -114,11 +114,10 @@ class FeedPatchSerializer(serializers.ModelSerializer):
         model = Feed
         fields = ['title', 'description', 'pretty_url', 'source_category']
 
-class FeedFetchSerializer(FeedPatchSerializer, FeedSerializer):
+
+class FeedFetchSerializer(serializers.Serializer):
     force_full_fetch = serializers.BooleanField(write_only=True, default=False, help_text="If true, will re-fetch all items from the earliest search date instead of from the latest known item date.")
-    class Meta:
-        model = Feed
-        fields = ['include_remote_blogs', 'force_full_fetch']
+    include_remote_blogs = serializers.BooleanField(write_only=True, default=False, help_text="If true, will include remote blogs in the fetch process.")
 
 class PostCreateSerializer(PostSerializer):
     link = serializers.URLField(validators=[normalize_url])

@@ -179,29 +179,28 @@ def test_fetch_feed(client, api_schema):
         api_schema['/api/v1/feeds/{feed_id}/fetch/']['PATCH'].validate_response(Transport.get_st_response(resp))
 
 
+@pytest.mark.parametrize("force_full_fetch", [True, False, None])
 @pytest.mark.django_db
-def test_new_fetch_job(feed):
-    request = Request(HttpRequest())
+def test_new_fetch_job(feed, force_full_fetch):
+    request = MagicMock()
+    request.data = dict(include_remote_blogs=False)
+    if force_full_fetch is not None:
+        request.data["force_full_fetch"] = force_full_fetch
+    force_full_fetch = bool(force_full_fetch)
     view = FeedView()
     view.request = request
     view.kwargs = dict(feed_id=feed.id)
     with (
         patch(
             "history4feed.app.views.task_helper.new_job",
-            side_effect=lambda *args: Job.objects.create(feed=args[0]),
         ) as mock_new_job,
         patch(
             "history4feed.app.views.FeedFetchSerializer",
             side_effect=FeedFetchSerializer,
         ) as mock_fetch_feed_serializer,
     ):
-        result = view.new_fetch_job(request)
-        assert feed.pk == result.feed.pk
-        assert result.feed == feed
-        mock_new_job.assert_called_once_with(result.feed, False)
-        mock_fetch_feed_serializer.assert_called_once_with(
-            feed, data=request.data, partial=True
-        )
+        view.new_fetch_job(request)
+        mock_new_job.assert_called_once_with(feed, False, force_full_fetch=force_full_fetch)
 
 
 @pytest.mark.parametrize(

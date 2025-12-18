@@ -476,13 +476,12 @@ class FeedView(viewsets.ModelViewSet):
         return Response(feed, status=status.HTTP_201_CREATED)
 
     def new_fetch_job(self, request):
-        feed_obj: Feed = self.get_object()
+        feed_obj: Feed = get_object_or_404(Feed, id=self.kwargs.get("feed_id"))
         if feed_obj.feed_type == FeedType.SKELETON:
             raise validators.ValidationError(f"fetch not supported for feed of type {feed_obj.feed_type}")
-        s = FeedFetchSerializer(feed_obj, data=request.data, partial=True)
+        s = FeedFetchSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        s.save()
-        return task_helper.new_job(feed_obj, s.validated_data.get('include_remote_blogs', False), force_full_fetch=s.validated_data['force_full_fetch'])
+        return task_helper.new_job(feed_obj, s.validated_data['include_remote_blogs'], force_full_fetch=s.validated_data['force_full_fetch'])
 
     @extend_schema(
         summary="Search for Feeds",
