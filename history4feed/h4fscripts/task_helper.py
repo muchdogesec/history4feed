@@ -2,6 +2,7 @@ import time
 from celery import shared_task, Task as CeleryTask
 import celery
 from celery.result import ResultSet, AsyncResult
+from celery.exceptions import SoftTimeLimitExceeded, TimeLimitExceeded
 import redis
 
 from history4feed.h4fscripts.sitemap_helpers import fetch_posts_links_with_serper
@@ -34,17 +35,22 @@ def queue_lock(feed: models.Feed, job=None):
 
 
 @transaction.atomic()
-def new_job(feed: models.Feed, include_remote_blogs):
+def new_job(feed: models.Feed, include_remote_blogs, force_full_fetch=False):
+    earliest_item_requested = feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE
+    if force_full_fetch:
+        earliest_item_requested = settings.EARLIEST_SEARCH_DATE
     job_obj = models.Job.objects.create(
         feed=feed,
-        earliest_item_requested=feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE,
+        earliest_item_requested=earliest_item_requested,
         latest_item_requested=datetime.now(UTC),
         include_remote_blogs=include_remote_blogs,
     )
     if not queue_lock(feed, job_obj):
         raise Throttled(detail={"message": "A job is already running for this feed", **cache.get(get_lock_id(feed))})
 
-    (start_job.s(job_obj.pk) | retrieve_posts_from_links.s(job_obj.pk) | wait_for_all_with_retry.s() | collect_and_schedule_removal.si(job_obj.pk)).apply_async(countdown=5, link_error=error_handler.s(job_obj.pk))
+    task = (start_job.s(job_obj.pk) | retrieve_posts_from_links.s(job_obj.pk))
+    task.stamp(job_id=str(job_obj.id))
+    task.apply_async(countdown=5, link_error=error_handler.s(job_obj.pk))
     return job_obj
 
 def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_remote_blogs=True):
@@ -59,7 +65,10 @@ def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_rem
         link=post.link,
     ) for post in posts]
     chain = celery.chain([retrieve_full_text.si(ft_job.pk) for ft_job in ft_jobs])
-    ( start_post_job.si(job_obj.id) | chain | collect_and_schedule_removal.si(job_obj.pk)).apply_async(link_error=error_handler.s(job_obj.pk), countdown=5)
+    chain.stamp(job_id=str(job_obj.id))
+    task = ( start_post_job.si(job_obj.id) | chain | collect_and_schedule_removal.si(job_obj.pk))
+    task.stamp(job_id=str(job_obj.id))
+    task.apply_async(link_error=error_handler.s(job_obj.pk), countdown=5)
     return job_obj
 
 @shared_task(bind=True, default_retry_delay=10)
@@ -74,7 +83,7 @@ def start_post_job(self: CeleryTask, job_id):
     job.update_state(models.JobState.RUNNING)
     return True
 
-@shared_task
+@shared_task(soft_time_limit=600, time_limit=800)
 def start_job(job_id):
     job = models.Job.objects.get(pk=job_id)
     feed = job.feed
@@ -89,27 +98,24 @@ def start_job(job_id):
         job.save(update_fields=['info'])
         return []
 
-@shared_task(bind=True, default_retry_delay=10)
-def wait_for_all_with_retry(self, result_ids):
-    if not result_ids:
-        return []
-    result_set = ResultSet([AsyncResult(task_id) for task_id in result_ids])
-    if not result_set.ready():
-        return self.retry(max_retries=360)
-    return result_ids
 
-@shared_task
-def retrieve_posts_from_links(urls, job_id):
+
+@shared_task(bind=True)
+def retrieve_posts_from_links(self, urls, job_id):
     if not urls:
-        return []
+        return self.replace(collect_and_schedule_removal.si(job_id))
     full_text_chain = models.Job.objects.get(pk=job_id)
     feed = full_text_chain.feed
     chains = []
     parsed_feed = {}
     job = models.Job.objects.get(id=job_id)
+    job.extra_data["urls"] = [dict(link=url, state='queued', posts_added=0) for url in urls]
+    job.save(update_fields=['extra_data'])
     for index, url in enumerate(urls):
         if job.is_cancelled():
             break
+        job.extra_data["urls"][index]['state'] = 'processing'
+        job.save(update_fields=['extra_data'])
         error = None
         if feed.feed_type == models.FeedType.SEARCH_INDEX:
             posts = retrieve_posts_from_serper(feed, job, url)
@@ -117,13 +123,19 @@ def retrieve_posts_from_links(urls, job_id):
             parsed_feed, posts, error = retrieve_posts_from_url(url, feed, job)
         if error:
             logger.exception(error)
+            job.extra_data["urls"][index]['state'] = 'failed'
+            job.save(update_fields=['extra_data'])
             continue
         if not posts:
             logger.warning('no new post in `%s`', url)
             continue
+        job.extra_data["urls"][index]['state'] = 'completed'
+        job.extra_data["urls"][index]['posts_added'] = len(posts)
+        job.save(update_fields=['extra_data'])
 
         full_text_chain = create_fulltexts_task_chain(job_id, posts)
-        chains.append(full_text_chain.apply_async())
+        full_text_chain.stamp(job_id=str(job_id))
+        chains.append(full_text_chain)
 
     if parsed_feed:
         feed.set_description(parsed_feed['description'])
@@ -132,7 +144,11 @@ def retrieve_posts_from_links(urls, job_id):
     
     feed.save()
     logger.info("====\n"*5)
-    return [result.id for result in chains]
+    
+    callback = collect_and_schedule_removal.si(job_id)
+    if chains:
+        return self.replace(celery.chord(chains, callback))
+    return self.replace(callback)
 
 def create_fulltexts_task_chain(job_id, posts):
     chain_tasks = []
@@ -142,7 +158,10 @@ def create_fulltexts_task_chain(job_id, posts):
                 post_id=post.id,
                 link=post.link,
             )
-        chain_tasks.append(retrieve_full_text.si(ftjob_entry.pk))
+        task = retrieve_full_text.si(ftjob_entry.pk)
+        task.stamp(job_id=str(job_id))
+        chain_tasks.append(task)
+        
     return celery.chain(chain_tasks)
 
 def retrieve_posts_from_serper(feed, job, url):
@@ -232,7 +251,8 @@ def add_post_to_db(db_feed: models.Feed, job: models.Job, post_dict: h4f.PostDic
     post.add_categories(categories)
     return post
         
-@shared_task()
+
+@shared_task(soft_time_limit=settings.FULLTEXT_FETCH_TIMEOUT_SECONDS, time_limit=settings.FULLTEXT_FETCH_TIMEOUT_SECONDS + 20)
 def retrieve_full_text(ftjob_pk):
     fulltext_job = models.FulltextJob.objects.get(pk=ftjob_pk)
     try:
@@ -246,12 +266,15 @@ def retrieve_full_text(ftjob_pk):
     except JobCancelled:
         fulltext_job.status = models.FullTextState.CANCELLED
         fulltext_job.error_str = "job cancelled while retrieving fulltext"
+    except (SoftTimeLimitExceeded, TimeLimitExceeded) as e:
+        fulltext_job.status = models.FullTextState.TIMED_OUT
+        fulltext_job.error_str = f"task timed out: {str(e)}"
+        logger.warning(f"Task retrieve_full_text for ftjob {ftjob_pk} timed out")
     except BaseException as e:
         fulltext_job.error_str = str(e)
         fulltext_job.status = models.FullTextState.FAILED
     fulltext_job.save()
     fulltext_job.post.save()
-
 
 
 from celery import signals

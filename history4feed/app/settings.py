@@ -13,7 +13,8 @@ H4F_DEFAULTS: dict[str, any] = {
     'EARLIEST_SEARCH_DATE': datetime(2020, 1, 1, tzinfo=timezone.utc),
     'REQUEST_RETRY_COUNT': 3,
     'HISTORY4FEED_NAMESPACE': uuid.UUID("6c6e6448-04d4-42a3-9214-4f0f7d02694e"),
-    "BRAVE_SEARCH_API_KEY": None
+    "BRAVE_SEARCH_API_KEY": None,
+    "FULLTEXT_FETCH_TIMEOUT_SECONDS": 100, # time limit for fulltext fetch tasks
 }
 
 IMPORT_STRINGS = [
@@ -26,6 +27,7 @@ class History4FeedServerSettings(APISettings):
     REQUEST_RETRY_COUNT: int
     HISTORY4FEED_NAMESPACE : str|uuid.UUID
     BRAVE_SEARCH_API_KEY: str
+    FULLTEXT_FETCH_TIMEOUT_SECONDS: int
 
     @property
     def user_settings(self):

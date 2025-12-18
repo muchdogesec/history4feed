@@ -450,12 +450,11 @@ class FeedView(viewsets.ModelViewSet):
             The following key/values are accepted in the body of the request:
 
              * `include_remote_blogs` (required): is a boolean setting and will ask history4feed to ignore any feeds not on the same domain as the URL of the feed. Some feeds include remote posts from other sites (e.g. for a paid promotion). This setting (set to `false` allows you to ignore remote posts that do not use the same domain as the `url` used). Generally you should set `include_remote_blogs` to `false`. The one exception is when things like feed aggregators (e.g. Feedburner) URLs are used, where the actual blog posts are not on the `feedburner.com` (or whatever) domain. In this case `include_remote_blogs` should be set to `true`.
+             * `force_full_fetch` (required, boolean): by default the behaviour (`false`) will check for new posts on this blog since the last post time. In some cases you might want to consider all posts. For example, setting to `false` can miss updates that have happened to currently indexed posts (where the RSS or ATOM feed or search results do not report the updated date correctly -- which is actually very common). To solve this, you can set this setting to `true`. This will then get all URLs available on the blog from the earliest search date (same as when adding a new feed), compare these URLs to those for posts indexed, and then fetch posts for URLs not already indexed.
 
             Each post ID is generated using a UUIDv5. The namespace used is `6c6e6448-04d4-42a3-9214-4f0f7d02694e` (history4feed) and the value used `<FEED_ID>+<POST_URL>+<POST_PUB_TIME (to .000000Z)>` (e.g. `d1d96b71-c687-50db-9d2b-d0092d1d163a+https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-post.html+2024-08-20T10:00:00.000000Z` = `22173843-f008-5afa-a8fb-7fc7a4e3bfda`).
 
             **IMPORTANT:** this request will fail if run against a Skeleton type feed. Skeleton feeds can only be updated by adding posts to them manually using the Manually Add a Post to a Feed endpoint.
-
-            **IMPORTANT:** this endpoint can miss updates that have happened to currently indexed posts (where the RSS or ATOM feed or search results do not report the updated date correctly -- which is actually very common). To solve this issue for currently indexed blog posts, use the Update a Post in a Feed endpoint directly.
 
             The response will return the Job information responsible for getting the requested data you can track using the `id` returned via the GET Jobs by ID endpoint.
             """
@@ -477,13 +476,12 @@ class FeedView(viewsets.ModelViewSet):
         return Response(feed, status=status.HTTP_201_CREATED)
 
     def new_fetch_job(self, request):
-        feed_obj: Feed = self.get_object()
+        feed_obj: Feed = get_object_or_404(Feed, id=self.kwargs.get("feed_id"))
         if feed_obj.feed_type == FeedType.SKELETON:
             raise validators.ValidationError(f"fetch not supported for feed of type {feed_obj.feed_type}")
-        s = FeedFetchSerializer(feed_obj, data=request.data, partial=True)
+        s = FeedFetchSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        s.save()
-        return task_helper.new_job(feed_obj, s.validated_data.get('include_remote_blogs', False))
+        return task_helper.new_job(feed_obj, s.validated_data['include_remote_blogs'], force_full_fetch=s.validated_data['force_full_fetch'])
 
     @extend_schema(
         summary="Search for Feeds",
@@ -695,9 +693,12 @@ class feed_post_view(
         job_resp = JobSerializer(job_obj).data.copy()
         # job_resp.update(post_id=post.id)
         return Response(job_resp, status=status.HTTP_201_CREATED)
+    
+    def reindex_queryset(self):
+        return self.get_queryset().all()
 
     def new_reindex_feed_job(self, feed_id):
-        posts = self.get_queryset().all()
+        posts = self.reindex_queryset()
         feed_obj = get_object_or_404(Feed, id=feed_id)
         job_obj = task_helper.new_patch_posts_job(feed_obj, tuple(posts))
         return job_obj

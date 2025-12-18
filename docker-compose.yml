@@ -29,6 +29,8 @@ services:
         depends_on:
             redis:
                 condition: service_started
+            env_django:
+                condition: service_completed_successfully
     celery:
         image: history4feed
         extends: env_django
