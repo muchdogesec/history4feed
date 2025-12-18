@@ -14,7 +14,6 @@ H4F_DEFAULTS: dict[str, any] = {
     'REQUEST_RETRY_COUNT': 3,
     'HISTORY4FEED_NAMESPACE': uuid.UUID("6c6e6448-04d4-42a3-9214-4f0f7d02694e"),
     "BRAVE_SEARCH_API_KEY": None,
-    "CANCEL_TIMEOUT_SECONDS": 100, # time to wait before terminating cancelled jobs
     "FULLTEXT_FETCH_TIMEOUT_SECONDS": 100, # time limit for fulltext fetch tasks
 }
 
@@ -28,7 +27,6 @@ class History4FeedServerSettings(APISettings):
     REQUEST_RETRY_COUNT: int
     HISTORY4FEED_NAMESPACE : str|uuid.UUID
     BRAVE_SEARCH_API_KEY: str
-    CANCEL_TIMEOUT_SECONDS: int
     FULLTEXT_FETCH_TIMEOUT_SECONDS: int
 
     @property
