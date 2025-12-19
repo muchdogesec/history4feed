@@ -72,8 +72,9 @@ def test_create_feed(client, api_schema):
 
 @pytest.mark.parametrize("include_remote_blogs", [True, False])
 @pytest.mark.parametrize("use_search_index", [True, False])
+@pytest.mark.parametrize("use_feed_url_only", [True, False, None])
 @pytest.mark.django_db
-def test_new_create_job(use_search_index, include_remote_blogs):
+def test_new_create_job(use_search_index, include_remote_blogs, use_feed_url_only):
     request = MagicMock()
     request.data = dict(
         title="some title",
@@ -82,10 +83,14 @@ def test_new_create_job(use_search_index, include_remote_blogs):
         use_search_index=use_search_index,
         include_remote_blogs=include_remote_blogs,
     )
+    if use_feed_url_only is not None:
+        request.data["use_feed_url_only"] = use_feed_url_only
+    else:
+        use_feed_url_only = False  # default value
     with (
         patch(
             "history4feed.app.views.task_helper.new_job",
-            side_effect=lambda *args: Job.objects.create(feed=args[0]),
+            side_effect=lambda *args, **kw: Job.objects.create(feed=args[0]),
         ) as mock_new_job,
         patch(
             "history4feed.app.views.SearchIndexFeedSerializer",
@@ -95,11 +100,12 @@ def test_new_create_job(use_search_index, include_remote_blogs):
             "history4feed.app.views.h4f.parse_feed_from_url"
         ) as mock_parse_feed_from_url,
     ):
+    
         mock_parse_feed_from_url.return_value = {**request.data, "feed_type": "atom"}
         result = FeedView().new_create_job(request)
         assert result.feed.title == request.data["title"]
         assert result.feed.description == request.data["description"]
-        mock_new_job.assert_called_once_with(result.feed, include_remote_blogs)
+        mock_new_job.assert_called_once_with(result.feed, include_remote_blogs, use_feed_url_only=use_feed_url_only)
         if use_search_index:
             mock_search_index_serializer.assert_called_once_with(data=request.data)
             assert result.feed.feed_type == FeedType.SEARCH_INDEX
@@ -180,13 +186,19 @@ def test_fetch_feed(client, api_schema):
 
 
 @pytest.mark.parametrize("force_full_fetch", [True, False, None])
+@pytest.mark.parametrize("use_feed_url_only", [True, False, None])
 @pytest.mark.django_db
-def test_new_fetch_job(feed, force_full_fetch):
+def test_new_fetch_job(feed, force_full_fetch, use_feed_url_only):
     request = MagicMock()
     request.data = dict(include_remote_blogs=False)
     if force_full_fetch is not None:
         request.data["force_full_fetch"] = force_full_fetch
-    force_full_fetch = bool(force_full_fetch)
+    else:
+        force_full_fetch = False  # default value
+    if use_feed_url_only is not None:
+        request.data["use_feed_url_only"] = use_feed_url_only
+    else:
+        use_feed_url_only = True  # default value
     view = FeedView()
     view.request = request
     view.kwargs = dict(feed_id=feed.id)
@@ -200,7 +212,7 @@ def test_new_fetch_job(feed, force_full_fetch):
         ) as mock_fetch_feed_serializer,
     ):
         view.new_fetch_job(request)
-        mock_new_job.assert_called_once_with(feed, False, force_full_fetch=force_full_fetch)
+        mock_new_job.assert_called_once_with(feed, False, force_full_fetch=force_full_fetch, use_feed_url_only=use_feed_url_only)
 
 
 @pytest.mark.parametrize(

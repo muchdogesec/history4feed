@@ -50,7 +50,7 @@ def test_new_job():
             "history4feed.h4fscripts.task_helper.queue_lock", return_value=True
         ) as mock_queue_lock,
     ):
-        new_job(feed, include_remote_blogs=False)
+        new_job(feed, include_remote_blogs=False, use_feed_url_only=True)
         job: Job = mock_queue_lock.call_args[0][1]
         assert job.feed == feed
         mock_queue_lock.assert_called_once_with(feed, job)
@@ -77,7 +77,7 @@ def test_new_job_with_force_full_fetch():
             "history4feed.h4fscripts.task_helper.queue_lock", return_value=True
         ) as mock_queue_lock,
     ):
-        new_job(feed, include_remote_blogs=False, force_full_fetch=True)
+        new_job(feed, include_remote_blogs=False, use_feed_url_only=True, force_full_fetch=True)
         job: Job = mock_queue_lock.call_args[0][1]
         assert job.feed == feed
         assert job.earliest_item_requested == settings.EARLIEST_SEARCH_DATE
@@ -105,7 +105,7 @@ def test_new_job_without_force_full_fetch():
             "history4feed.h4fscripts.task_helper.queue_lock", return_value=True
         ) as mock_queue_lock,
     ):
-        new_job(feed, include_remote_blogs=False, force_full_fetch=False)
+        new_job(feed, include_remote_blogs=False, use_feed_url_only=True, force_full_fetch=False)
         job: Job = mock_queue_lock.call_args[0][1]
         assert job.feed == feed
         assert job.earliest_item_requested == latest_pubdate
@@ -131,11 +131,12 @@ def test_new_job_full_fetch_without_latest_item_pubdate():
         ) as mock_queue_lock,
     ):
         # When latest_item_pubdate is None, should use EARLIEST_SEARCH_DATE regardless
-        new_job(feed, include_remote_blogs=False, force_full_fetch=False)
+        new_job(feed, include_remote_blogs=False, use_feed_url_only=True, force_full_fetch=False)
         job: Job = mock_queue_lock.call_args[0][1]
         assert job.feed == feed
         assert job.earliest_item_requested == settings.EARLIEST_SEARCH_DATE
         mock_queue_lock.assert_called_once_with(feed, job)
+        assert job.extra_data['use_feed_url_only'] == True
 
 
 @pytest.mark.django_db
@@ -152,7 +153,7 @@ def test_new_job_error_handler_called():
         ) as mock_queue_lock,
         pytest.raises(Exception, match="Start job failed"),
     ):
-        new_job(feed, include_remote_blogs=False)
+        new_job(feed, include_remote_blogs=False, use_feed_url_only=True)
         
     # After the exception, error_handler should have been called
     job: Job = mock_queue_lock.call_args[0][1]
@@ -176,8 +177,9 @@ def test_job_queue_fail():
         ) as mock_queue_lock,
         pytest.raises(Throttled),
     ):
-        new_job(feed, include_remote_blogs=False)
+        new_job(feed, include_remote_blogs=False, use_feed_url_only=False)
         job: Job = mock_queue_lock.call_args[0][1]
+        assert job.extra_data['use_feed_url_only'] == False
 
 
 @pytest.mark.django_db
@@ -274,12 +276,34 @@ def test_start_job__atom_or_rss():
             feed_type=models.FeedType.RSS,
         ),
         state=models.JobState.PENDING,
+        extra_data={"use_feed_url_only": False},
     )
     with patch(
         "history4feed.h4fscripts.wayback_helpers.get_wayback_urls"
     ) as mock_get_wayback_urls:
         result = start_job(job_obj.id)
         assert result == mock_get_wayback_urls.return_value
+        job_obj.refresh_from_db()
+        assert job_obj.state == models.JobState.RUNNING
+
+
+@pytest.mark.django_db
+def test_start_job__atom_or_rss__use_feed_url_only():
+    job_obj = models.Job.objects.create(
+        feed=Feed.objects.create(
+            url="https://example.com/rss.xml",
+            title="Test Feed",
+            feed_type=models.FeedType.RSS,
+        ),
+        state=models.JobState.PENDING,
+        extra_data={"use_feed_url_only": True},
+    )
+    with patch(
+        "history4feed.h4fscripts.wayback_helpers.get_wayback_urls"
+    ) as mock_get_wayback_urls:
+        result = start_job(job_obj.id)
+        assert result == [job_obj.feed.url]
+        mock_get_wayback_urls.assert_not_called()
         job_obj.refresh_from_db()
         assert job_obj.state == models.JobState.RUNNING
 
@@ -407,6 +431,7 @@ def test_retrieve_posts_from_serper():
             freshness=dt(2024, 1, 1, tzinfo=UTC),
         ),
         state=models.JobState.PENDING,
+        earliest_item_requested=dt(2023, 1, 2, tzinfo=UTC),
     )
     with (
         patch(
@@ -445,7 +470,7 @@ def test_retrieve_posts_from_serper():
         url = "https://example.net"
         results = retrieve_posts_from_serper(job_obj.feed, job_obj, url)
         mock_fetch.assert_called_once_with(
-            url, from_time=dt(2024, 1, 1, tzinfo=UTC), to_time=job_obj.run_datetime
+            url, from_time=dt(2023, 1, 2, tzinfo=UTC), to_time=job_obj.run_datetime
         )
         assert len(results) == 4
         mock_add_post_to_db.call_count == 4
@@ -579,14 +604,16 @@ def dummy_post():
 @patch("history4feed.h4fscripts.task_helper.logger")
 @patch("history4feed.h4fscripts.task_helper.h4f.get_full_text")
 @patch("history4feed.h4fscripts.task_helper.models.FulltextJob.objects.get")
-def test_retrieve_full_text_success(mock_get_job, mock_get_full_text, mock_logger, dummy_ftjob):
+@pytest.mark.parametrize("use_scrapfly_asp", [True, False])
+def test_retrieve_full_text_success(mock_get_job, mock_get_full_text, mock_logger, dummy_ftjob, use_scrapfly_asp):
     mock_get_job.return_value = dummy_ftjob
     dummy_ftjob.is_cancelled.return_value = False
     mock_get_full_text.return_value = ("<p>Content</p>", "text/html")
+    dummy_ftjob.job.extra_data = {"use_scrapfly_asp": use_scrapfly_asp}
 
     retrieve_full_text(dummy_ftjob.pk)
 
-    mock_get_full_text.assert_called_once_with(dummy_ftjob.post.link)
+    mock_get_full_text.assert_called_once_with(dummy_ftjob.post.link, use_scrapfly_asp=use_scrapfly_asp)
     assert dummy_ftjob.status == FullTextState.RETRIEVED
     assert dummy_ftjob.error_str == ""
     assert dummy_ftjob.post.description == "<p>Content</p>"

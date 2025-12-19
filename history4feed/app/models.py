@@ -88,6 +88,7 @@ class Feed(models.Model):
     source_category = models.CharField(max_length=100, default=SourceCategory.UNCATEGORIZED, choices=SourceCategory.choices)
     pretty_url = models.URLField(max_length=1000, null=True, default=None)
     freshness = models.DateTimeField(null=True, default=None)
+    use_scrapfly_asp = models.BooleanField(default=False)
 
     def get_post_count(self):
         return self.posts.filter(deleted_manually=False).count()
@@ -213,8 +214,6 @@ class FulltextJob(models.Model):
     status = models.CharField(max_length=15, choices=FullTextState.choices, default=FullTextState.RETRIEVING)
     error_str = models.CharField(max_length=1500, null=True, blank=True)
     link = models.CharField(max_length=1500)
-
-
         
     def is_cancelled(self):
         return self.job.state == JobState.CANCELLED

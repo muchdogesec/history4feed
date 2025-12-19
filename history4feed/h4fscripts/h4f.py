@@ -36,16 +36,16 @@ def fetch_page_with_retries(url, retry_count=3, sleep_seconds=settings.WAYBACK_S
             error = e
             print(error)
     raise ConnectionError(f"could not fetch page after {retry_count} retries") from error
-    
+
 class FatalError(Exception):
     pass
 
-def fetch_page(session, url, headers=None) -> tuple[bytes, str, str]:
+def fetch_page(session, url, headers=None, use_scrapfly_asp=False, **kwargs) -> tuple[bytes, str, str]:
     proxy_apikey = settings.SCRAPFLY_APIKEY
     headers = headers or {}
 
     if proxy_apikey:
-        headers, result = fetch_with_scapfly(session, url, headers, proxy_apikey)
+        headers, result = fetch_with_scapfly(session, url, headers, proxy_apikey, use_scrapfly_asp)
         return result.content.encode(), result.content_type, result.url
 
     logger.info(f"Fetching `{url}`")
@@ -61,10 +61,18 @@ def fetch_page(session, url, headers=None) -> tuple[bytes, str, str]:
         logger.print(f"brotli decompress fail: {err}")
     return content, resp.headers.get("content-type"), resp.url
 
-def fetch_with_scapfly(session, url, headers, proxy_apikey):
+def fetch_with_scapfly(session, url, headers, proxy_apikey, use_scrapfly_asp=False):
     logger.info(f"Fetching `{url}` via scrapfly.io")
     headers = dict((f"headers[{k}]", v) for k, v in headers.items())
-    resp = session.get("https://api.scrapfly.io/scrape", params=dict(**headers, key=proxy_apikey, url=url, country="us,ca,mx,gb,fr,de,au,at,be,hr,cz,dk,ee,fi,ie,se,es,pt,nl"))
+    params = dict(
+        **headers,
+        key=proxy_apikey,
+        url=url,
+        country="us,ca,mx,gb,fr,de,au,at,be,hr,cz,dk,ee,fi,ie,se,es,pt,nl",
+    )
+    if use_scrapfly_asp:
+        params["asp"] = "true"
+    resp = session.get("https://api.scrapfly.io/scrape", params=params)
     json_data = resp.json()
     if resp.status_code != 200:
         raise ScrapflyError(json_data)
@@ -81,9 +89,9 @@ def parse_feed_from_url(url):
     data, content_type, url = fetch_page_with_retries(url, retry_count=0)
     return parse_feed_from_content(data, url)
 
-def get_full_text(link):
+def get_full_text(link, use_scrapfly_asp):
     try:
-        page, content_type, url = fetch_page_with_retries(link)
+        page, content_type, url = fetch_page_with_retries(link, use_scrapfly_asp=use_scrapfly_asp)
         doc  = ReadabilityDocument(page.decode(), url=url)
         return doc.summary(), content_type
     except BaseException as e:
