@@ -256,3 +256,76 @@ def test_parse_feed_from_url(mock_parse: MagicMock, mock_fetch: MagicMock):
     parse_feed_from_url(url)
     mock_fetch.assert_called_once_with(url, retry_count=0)
     mock_parse.assert_called_once_with(1, 3)
+
+
+# ---------------------
+# SoftTimeLimitExceeded propagation tests
+# ---------------------
+
+@patch("history4feed.h4fscripts.h4f.time.sleep", return_value=None)
+@patch("history4feed.h4fscripts.h4f.fetch_page")
+@patch("history4feed.h4fscripts.h4f.fake_useragent.UserAgent")
+def test_fetch_page_with_retries_propagates_soft_timeout(mock_ua, mock_fetch_page, mock_sleep, dummy_url):
+    """Test that SoftTimeLimitExceeded is propagated immediately without retries"""
+    from celery.exceptions import SoftTimeLimitExceeded
+    
+    mock_ua().random = "test-agent"
+    mock_fetch_page.side_effect = SoftTimeLimitExceeded()
+
+    # Should raise immediately, not retry
+    with pytest.raises(SoftTimeLimitExceeded):
+        fetch_page_with_retries(dummy_url, retry_count=3)
+    
+    # Should be called only once - no retries
+    assert mock_fetch_page.call_count == 1
+    # Sleep should not be called since we don't retry
+    mock_sleep.assert_not_called()
+
+
+@patch("history4feed.h4fscripts.h4f.time.sleep", return_value=None)
+@patch("history4feed.h4fscripts.h4f.fetch_page")
+@patch("history4feed.h4fscripts.h4f.fake_useragent.UserAgent")
+def test_fetch_page_with_retries_propagates_soft_timeout_after_first_retry(mock_ua, mock_fetch_page, mock_sleep, dummy_url):
+    """Test that SoftTimeLimitExceeded is propagated even if it occurs after a failed retry"""
+    from celery.exceptions import SoftTimeLimitExceeded
+    
+    mock_ua().random = "test-agent"
+    # First call fails with normal exception, second call gets timeout
+    mock_fetch_page.side_effect = [Exception("temporary error"), SoftTimeLimitExceeded()]
+
+    with pytest.raises(SoftTimeLimitExceeded):
+        fetch_page_with_retries(dummy_url, retry_count=3)
+    
+    # Should be called twice (initial attempt + one retry that times out)
+    assert mock_fetch_page.call_count == 2
+    # Sleep should be called once (after first failure, before timeout)
+    assert mock_sleep.call_count == 1
+
+
+@patch("history4feed.h4fscripts.h4f.time.sleep", return_value=None)
+@patch("history4feed.h4fscripts.h4f.fetch_page")
+@patch("history4feed.h4fscripts.h4f.fake_useragent.UserAgent")
+def test_fetch_page_with_retries_propagates_fatal_error(mock_ua, mock_fetch_page, mock_sleep, dummy_url):
+    """Test that FatalError is also propagated immediately without retries"""
+    mock_ua().random = "test-agent"
+    mock_fetch_page.side_effect = FatalError("Server error 500+")
+
+    with pytest.raises(FatalError):
+        fetch_page_with_retries(dummy_url, retry_count=3)
+    
+    assert mock_fetch_page.call_count == 1
+    mock_sleep.assert_not_called()
+
+
+@patch("history4feed.h4fscripts.h4f.fetch_page_with_retries")
+def test_get_full_text_propagates_soft_timeout(mock_fetch, dummy_url):
+    """Test that get_full_text propagates SoftTimeLimitExceeded without catching it"""
+    from celery.exceptions import SoftTimeLimitExceeded
+    
+    mock_fetch.side_effect = SoftTimeLimitExceeded()
+    
+    # Should propagate, not be caught and wrapped
+    with pytest.raises(SoftTimeLimitExceeded):
+        get_full_text(dummy_url, use_scrapfly_asp=False)
+    
+    mock_fetch.assert_called_once()
