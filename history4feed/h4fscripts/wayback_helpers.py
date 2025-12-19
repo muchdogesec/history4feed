@@ -5,6 +5,7 @@ from collections import namedtuple
 from urllib.parse import urlencode
 from .h4f import FatalError, fetch_page_with_retries
 from history4feed.app.settings import history4feed_server_settings as settings
+from celery.exceptions import SoftTimeLimitExceeded
 
 DEFAULT_USER_AGENT = "curl"
 
@@ -36,6 +37,9 @@ def cdx_search(url, earliest: dt, latest: dt=None, retry_count=3, sleep_seconds=
             break
         except FatalError:
             return []
+        except SoftTimeLimitExceeded as e:
+            error = e
+            break
         except BaseException as e:
             error = e
             continue

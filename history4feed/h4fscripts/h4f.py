@@ -14,6 +14,7 @@ from .xml_utils import getAtomLink, getFirstChildByTag, getFirstElementByTag, ge
 from .exceptions import history4feedException, UnknownFeedtypeException, FetchRedirect, ScrapflyError
 import fake_useragent
 from urllib.parse import urljoin
+from celery.exceptions import SoftTimeLimitExceeded
 
 def fetch_page_with_retries(url, retry_count=3, sleep_seconds=settings.WAYBACK_SLEEP_SECONDS, **kwargs):
     ua = fake_useragent.UserAgent()
@@ -30,7 +31,7 @@ def fetch_page_with_retries(url, retry_count=3, sleep_seconds=settings.WAYBACK_S
             if i > 0:
                 time.sleep(sleep_seconds * 1.5 ** (i-1))
             return fetch_page(session, url, **kwargs)
-        except FatalError:
+        except (FatalError, SoftTimeLimitExceeded):
             raise
         except BaseException as e:
             error = e
@@ -94,6 +95,8 @@ def get_full_text(link, use_scrapfly_asp):
         page, content_type, url = fetch_page_with_retries(link, use_scrapfly_asp=use_scrapfly_asp)
         doc  = ReadabilityDocument(page.decode(), url=url)
         return doc.summary(), content_type
+    except SoftTimeLimitExceeded:
+        raise
     except BaseException as e:
         raise history4feedException(f"Error processing fulltext: {e}") from e
 
