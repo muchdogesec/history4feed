@@ -101,10 +101,11 @@ def test_fetch_page_uses_scrapfly(mock_fetch, settings, dummy_url):
     settings.HISTORY4FEED_SETTINGS = {
         'SCRAPFLY_APIKEY': api_key
     }
+    use_asp = MagicMock()
     mocked_resp = MagicMock()
     mock_fetch.return_value = [None, mocked_resp]
-    result = fetch_page(session, dummy_url)
-    mock_fetch.assert_called_once_with(session, dummy_url, {}, api_key)
+    result = fetch_page(session, dummy_url, use_scrapfly_asp=use_asp)
+    mock_fetch.assert_called_once_with(session, dummy_url, {}, api_key, use_asp)
     assert result == (mocked_resp.content.encode(), mocked_resp.content_type, mocked_resp.url)
 
 
@@ -142,8 +143,8 @@ def test_fetch_page_brotli_fails(mock_brotli, mock_logger, dummy_url):
 # ------------------------
 # fetch_with_scapfly
 # ------------------------
-
-def test_fetch_with_scapfly_success(dummy_url):
+@pytest.mark.parametrize("use_scrapfly_asp", [True, False])
+def test_fetch_with_scapfly_success(dummy_url, use_scrapfly_asp):
     session = MagicMock()
     result_data = {
         "result": {
@@ -162,7 +163,7 @@ def test_fetch_with_scapfly_success(dummy_url):
     headers = {"User-Agent": "curl"}
     proxy_apikey = "abc123"
 
-    returned_headers, result = fetch_with_scapfly(session, dummy_url, headers, proxy_apikey)
+    returned_headers, result = fetch_with_scapfly(session, dummy_url, headers, proxy_apikey, use_scrapfly_asp=use_scrapfly_asp)
 
     assert result.content == "<html></html>"
     assert result.content_type == "text/html"
@@ -174,6 +175,8 @@ def test_fetch_with_scapfly_success(dummy_url):
         "url": dummy_url,
         "country": "us,ca,mx,gb,fr,de,au,at,be,hr,cz,dk,ee,fi,ie,se,es,pt,nl"
     }
+    if use_scrapfly_asp:
+        expected_params["asp"] = "true"
     session.get.assert_called_once_with("https://api.scrapfly.io/scrape", params=expected_params)
 
 
@@ -196,7 +199,7 @@ def test_fetch_with_scapfly_500_error(dummy_url):
     session.get.return_value = response
 
     with pytest.raises(FatalError):
-        fetch_with_scapfly(session, dummy_url, {"User-Agent": "UA"}, "apikey")
+        fetch_with_scapfly(session, dummy_url, {"User-Agent": "UA"}, "apikey", use_scrapfly_asp=False)
 
 
 def test_fetch_with_scapfly_redirect(dummy_url):
@@ -227,12 +230,13 @@ def test_fetch_with_scapfly_redirect(dummy_url):
 @patch.object(ReadabilityDocument, 'summary', side_effect=ReadabilityDocument.summary, autospec=True)
 def test_get_full_text_success(mock_summary, mock_fetch, mock_readability, dummy_url):
     mock_fetch.return_value = (b"<html>Article</html>", "text/html", dummy_url)
+    use_scrapfly = MagicMock()
 
-    summary, ctype = get_full_text(dummy_url)
+    summary, ctype = get_full_text(dummy_url, use_scrapfly_asp=use_scrapfly)
 
     assert isinstance(summary, str)
     assert ctype == "text/html"
-    mock_fetch.assert_called_once_with(dummy_url)
+    mock_fetch.assert_called_once_with(dummy_url, use_scrapfly_asp=use_scrapfly)
     mock_readability.assert_called_once_with("<html>Article</html>", url=dummy_url)
     mock_summary.assert_called_once()
 
@@ -240,7 +244,7 @@ def test_get_full_text_success(mock_summary, mock_fetch, mock_readability, dummy
 @patch("history4feed.h4fscripts.h4f.fetch_page_with_retries", side_effect=Exception("failure"))
 def test_get_full_text_raises(mock_fetch, dummy_url):
     with pytest.raises(history4feedException) as e:
-        get_full_text(dummy_url)
+        get_full_text(dummy_url, use_scrapfly_asp=False)
     assert "Error processing fulltext: failure" in str(e.value)
 
 

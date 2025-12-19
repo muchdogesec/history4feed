@@ -257,7 +257,6 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
         return Response(None, status=status.HTTP_204_NO_CONTENT)
 
 
-
 class FeedView(viewsets.ModelViewSet):
     openapi_tags = ["Feeds"]
     serializer_class = FeedSerializer
@@ -301,8 +300,6 @@ class FeedView(viewsets.ModelViewSet):
         )
         source_category = Filter(help_text="Filter by the source category of a feed")
 
-
-
     def get_queryset(self):
         return Feed.objects.all().annotate(count_of_posts=Count("posts"))
 
@@ -345,7 +342,7 @@ class FeedView(viewsets.ModelViewSet):
             job_id=job_obj.id,
         )
         return Response(resp_data, status=status.HTTP_201_CREATED)
-    
+
     def new_create_job(self, request: request.Request):
         feed_data = {}
         s = FeedSerializer(data=request.data)
@@ -365,12 +362,16 @@ class FeedView(viewsets.ModelViewSet):
                 feed_data[k] = v
             elif v := feed_data.get(k):
                 feed_data[k] = v + AUTO_TITLE_TRAIL
-        
+
         s2 = FeedSerializer(data={**s.data, **feed_data})
         s2.is_valid(raise_exception=True)
 
         feed_obj: Feed = s2.save(feed_type=feed_data['feed_type'])
-        job_obj = task_helper.new_job(feed_obj, s.validated_data.get('include_remote_blogs', False))
+        job_obj = task_helper.new_job(
+            feed_obj,
+            s.validated_data["include_remote_blogs"],
+            use_feed_url_only=s.validated_data["use_feed_url_only"],
+        )
         return job_obj
 
     @extend_schema(
@@ -401,7 +402,7 @@ class FeedView(viewsets.ModelViewSet):
         s.is_valid(raise_exception=True)
         instance = s.save()
         return Response(FeedSerializer(instance).data, status=status.HTTP_201_CREATED)
-    
+
     @extend_schema(
         parameters=[FEED_ID_PARAM],
         summary="Update a Feeds Metadata",
@@ -438,7 +439,7 @@ class FeedView(viewsets.ModelViewSet):
         s.is_valid(raise_exception=True)
         s.save(datetime_modified=django.utils.timezone.now())
         return Response(self.serializer_class(feed_obj).data, status=status.HTTP_201_CREATED)
-    
+
     @extend_schema(
         parameters=[FEED_ID_PARAM],
         summary="Fetch Updates for a Feed",
@@ -481,7 +482,12 @@ class FeedView(viewsets.ModelViewSet):
             raise validators.ValidationError(f"fetch not supported for feed of type {feed_obj.feed_type}")
         s = FeedFetchSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        return task_helper.new_job(feed_obj, s.validated_data['include_remote_blogs'], force_full_fetch=s.validated_data['force_full_fetch'])
+        return task_helper.new_job(
+            feed_obj,
+            s.validated_data["include_remote_blogs"],
+            force_full_fetch=s.validated_data["force_full_fetch"],
+            use_feed_url_only=s.validated_data["use_feed_url_only"],
+        )
 
     @extend_schema(
         summary="Search for Feeds",
@@ -533,7 +539,7 @@ class FeedView(viewsets.ModelViewSet):
     )
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
-    
+
 class RSSView(viewsets.GenericViewSet):
     class filterset_class(PostOnlyView.filterset_class):
         feed_id = None

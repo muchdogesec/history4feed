@@ -35,15 +35,20 @@ def queue_lock(feed: models.Feed, job=None):
 
 
 @transaction.atomic()
-def new_job(feed: models.Feed, include_remote_blogs, force_full_fetch=False):
-    earliest_item_requested = feed.latest_item_pubdate or settings.EARLIEST_SEARCH_DATE
+def new_job(feed: models.Feed, include_remote_blogs, use_feed_url_only, force_full_fetch=True):
+    earliest_item_requested = feed.latest_item_pubdate
+    if feed.feed_type == models.FeedType.SEARCH_INDEX:
+        earliest_item_requested = feed.freshness
+    earliest_item_requested = earliest_item_requested or settings.EARLIEST_SEARCH_DATE
     if force_full_fetch:
         earliest_item_requested = settings.EARLIEST_SEARCH_DATE
+    
     job_obj = models.Job.objects.create(
         feed=feed,
         earliest_item_requested=earliest_item_requested,
         latest_item_requested=datetime.now(UTC),
         include_remote_blogs=include_remote_blogs,
+        extra_data=dict(force_full_fetch=force_full_fetch, use_feed_url_only=use_feed_url_only, use_scrapfly_asp=feed.use_scrapfly_asp),
     )
     if not queue_lock(feed, job_obj):
         raise Throttled(detail={"message": "A job is already running for this feed", **cache.get(get_lock_id(feed))})
@@ -58,6 +63,7 @@ def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_rem
         feed=feed,
         state=models.JobState.PENDING,
         include_remote_blogs=include_remote_blogs,
+        extra_data=dict(use_scrapfly_asp=feed.use_scrapfly_asp),
     )
     ft_jobs = [models.FulltextJob.objects.create(
         job_id=job_obj.id,
@@ -89,7 +95,7 @@ def start_job(job_id):
     feed = job.feed
     job.update_state(models.JobState.RUNNING)
     try:
-        if feed.feed_type == models.FeedType.SEARCH_INDEX:
+        if feed.feed_type == models.FeedType.SEARCH_INDEX or job.extra_data["use_feed_url_only"]:
             return [feed.url]
         return wayback_helpers.get_wayback_urls(feed.url, job.earliest_item_requested, job.latest_item_requested)
     except BaseException as e:
@@ -127,6 +133,8 @@ def retrieve_posts_from_links(self, urls, job_id):
             job.save(update_fields=['extra_data'])
             continue
         if not posts:
+            job.extra_data["urls"][index]['state'] = 'completed'
+            job.save(update_fields=['extra_data'])
             logger.warning('no new post in `%s`', url)
             continue
         job.extra_data["urls"][index]['state'] = 'completed'
@@ -164,8 +172,8 @@ def create_fulltexts_task_chain(job_id, posts):
         
     return celery.chain(chain_tasks)
 
-def retrieve_posts_from_serper(feed, job, url):
-    start_time = feed.freshness or settings.EARLIEST_SEARCH_DATE
+def retrieve_posts_from_serper(feed: models.Feed, job: models.Job, url: str):
+    start_time = job.earliest_item_requested
     if not start_time.tzinfo:
         start_time = start_time.replace(tzinfo=UTC)
     crawled_posts = fetch_posts_links_with_serper(url, from_time=start_time, to_time=job.run_datetime)
@@ -255,11 +263,12 @@ def add_post_to_db(db_feed: models.Feed, job: models.Job, post_dict: h4f.PostDic
 @shared_task(soft_time_limit=settings.FULLTEXT_FETCH_TIMEOUT_SECONDS, time_limit=settings.FULLTEXT_FETCH_TIMEOUT_SECONDS + 20)
 def retrieve_full_text(ftjob_pk):
     fulltext_job = models.FulltextJob.objects.get(pk=ftjob_pk)
+    use_scrapfly_asp = fulltext_job.job.extra_data["use_scrapfly_asp"]
     try:
         if fulltext_job.is_cancelled():
             raise JobCancelled()
         else:
-            fulltext_job.post.description, fulltext_job.post.content_type = h4f.get_full_text(fulltext_job.post.link)
+            fulltext_job.post.description, fulltext_job.post.content_type = h4f.get_full_text(fulltext_job.post.link, use_scrapfly_asp=use_scrapfly_asp)
             fulltext_job.status = models.FullTextState.RETRIEVED
             fulltext_job.error_str = ""
             fulltext_job.post.is_full_text = True

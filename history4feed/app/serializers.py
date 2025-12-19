@@ -19,6 +19,8 @@ class FeedSerializer(serializers.ModelSerializer):
     title = TitleField(required=False, max_length=256, allow_null=True, allow_blank=True)
     description = TitleField(required=False, max_length=FEED_DESCRIPTION_MAX_LENGTH, allow_null=True, allow_blank=True)
     use_search_index = serializers.BooleanField(default=False, write_only=True, help_text="should use search index instead")
+    use_feed_url_only = serializers.BooleanField(write_only=True, default=False, help_text="If true, will only use the feed URL to fetch posts, ignoring WaybackMachine source.")
+    use_scrapfly_asp = serializers.BooleanField(required=False, default=False, help_text="If true, will use Scapfile's Antiscraping Protection to reduce error rates.")
     class Meta:
         model = Feed
         # fields = '__all__'
@@ -29,6 +31,7 @@ class FeedSerializer(serializers.ModelSerializer):
         validated_data = validated_data.copy()
         validated_data.pop('include_remote_blogs', None)
         validated_data.pop('use_search_index', None)
+        validated_data.pop('use_feed_url_only', None)
         return super().create(validated_data)
     
 class SkeletonFeedSerializer(FeedSerializer):
@@ -112,12 +115,13 @@ class FeedPatchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Feed
-        fields = ['title', 'description', 'pretty_url', 'source_category']
-
+        fields = ['title', 'description', 'pretty_url', 'source_category', 'use_scrapfly_asp']
 
 class FeedFetchSerializer(serializers.Serializer):
     force_full_fetch = serializers.BooleanField(write_only=True, default=False, help_text="If true, will re-fetch all items from the earliest search date instead of from the latest known item date.")
     include_remote_blogs = serializers.BooleanField(write_only=True, default=False, help_text="If true, will include remote blogs in the fetch process.")
+    use_feed_url_only = serializers.BooleanField(write_only=True, default=True, help_text="If true, will only use the feed URL to fetch posts, ignoring WaybackMachine source.")
+
 
 class PostCreateSerializer(PostSerializer):
     link = serializers.URLField(validators=[normalize_url])
