@@ -134,13 +134,18 @@ class PostCreateSerializer(PostSerializer):
         list_serializer_class = PostListSerializer
         model = Post
         fields = ["title", "link", "pubdate", "author", "categories", "feed_id"]
-        validators = [
-            validators.UniqueTogetherValidator(
-                queryset=Post.visible_posts(),
-                fields=('feed_id', 'link'),
-                message='Post with link already exists in feed.',
-            )
-        ]
+    
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # Check if post with this link already exists in the feed
+        feed_id = attrs.get('feed_id')
+        link = attrs.get('link')
+        if feed_id and link:
+            if Post.visible_posts().filter(feed_id=feed_id, link=link).exists():
+                raise serializers.ValidationError({
+                    'link': f'Post at `{link}` already exists in feed.'
+                })
+        return attrs
 
 class PostPatchSerializer(PostSerializer):
     class Meta:
