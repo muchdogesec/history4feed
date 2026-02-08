@@ -19,3 +19,4 @@ def test_create_posts_serializer__existing_url(feed_posts):
     assert not serializer.is_valid()
     assert 'link' in serializer.errors['posts'][0]
     assert serializer.errors['posts'][0]['link'][0] == f'Post at `{post.link}` already exists in feed.'
+

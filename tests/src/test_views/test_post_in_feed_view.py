@@ -1,3 +1,4 @@
+from django.forms import ValidationError
 import pytest
 from rest_framework import status
 from history4feed.app.models import Feed, Job
@@ -74,6 +75,33 @@ def test_new_create_post_job(feed):
         mock_new_job.assert_called_once_with(feed, [post])
         assert job == mock_new_job.return_value
 
+
+@pytest.mark.django_db
+def test_new_create_post_job__existing(client, feed_posts):
+    feed, (post, *_) = feed_posts
+    posts_data = [
+        {
+            "link": "https://example.com/new-post",
+            "title": "New Post",
+            "pubdate": "2024-08-20T10:00:00.000Z",
+        },
+        {
+            "link": post.link,  # Same link as existing post
+            "title": "Test Post",
+            "pubdate": "2024-08-20T10:00:00.000Z",
+        }
+    ]
+    payload = dict(posts=posts_data)
+    request = MagicMock()
+    request.data = payload
+    url = f"/api/v1/feeds/{feed.id}/posts/"
+    resp = client.post(url, data=payload, content_type="application/json")
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    import json
+    data = json.loads(resp.content)['details']
+    assert isinstance(data['posts'], dict)
+    assert 'link' in data['posts']['1']
+    assert data['posts']['1']['link'][0] == f'Post at `{post.link}` already exists in feed.'
 
 @pytest.mark.django_db
 def test_reindex_feed(client, feed_posts, api_schema):
