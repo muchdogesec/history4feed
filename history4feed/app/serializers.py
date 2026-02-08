@@ -158,8 +158,9 @@ class CreatePostsSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         posts = [{**post, **self.save_kwargs} for post in validated_data["posts"]]
-        
-        return self.fields['posts'].create(posts)
+        posts_serializer = PostSerializer(data=posts, many=True, context=self.context)
+        posts_serializer.is_valid(raise_exception=True)
+        return posts_serializer.save()
     
     def save(self, **kwargs):
         self.save_kwargs = kwargs

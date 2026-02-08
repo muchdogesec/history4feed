@@ -74,6 +74,9 @@ def test_new_create_post_job(feed):
         post = feed.posts.first()
         mock_new_job.assert_called_once_with(feed, [post])
         assert job == mock_new_job.return_value
+        assert post.link == posts_data[0]["link"]
+        assert post.title == posts_data[0]["title"]
+        assert post.feed_id == feed.id
 
 
 @pytest.mark.django_db
