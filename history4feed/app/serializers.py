@@ -132,6 +132,8 @@ class PostCreateSerializer(PostSerializer):
         
     class Meta:
         model = Post
+        list_serializer_class = PostListSerializer
+
         fields = ["title", "link", "pubdate", "author", "categories", "feed_id"]
     
     def validate(self, attrs):
