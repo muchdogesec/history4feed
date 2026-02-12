@@ -131,7 +131,6 @@ class PostCreateSerializer(PostSerializer):
     feed_id = feed_class(default=None)
         
     class Meta:
-        list_serializer_class = PostListSerializer
         model = Post
         fields = ["title", "link", "pubdate", "author", "categories", "feed_id"]
     
@@ -154,12 +153,14 @@ class PostPatchSerializer(PostSerializer):
 
     
 class CreatePostsSerializer(serializers.Serializer):
-    posts = PostCreateSerializer(many=True, allow_empty=False)
+    posts = serializers.ListField(child=PostCreateSerializer(), allow_empty=False)
+
 
     def create(self, validated_data):
         posts = [{**post, **self.save_kwargs} for post in validated_data["posts"]]
-        
-        return self.fields['posts'].create(posts)
+        posts_serializer = PostSerializer(data=posts, many=True, context=self.context)
+        posts_serializer.is_valid(raise_exception=True)
+        return posts_serializer.save()
     
     def save(self, **kwargs):
         self.save_kwargs = kwargs
