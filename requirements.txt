@@ -89,7 +89,7 @@ lxml[html-clean]==6.0.0
     # via
     #   lxml-html-clean
     #   readability-lxml
-lxml-html-clean==0.4.2
+lxml-html-clean==0.4.4
     # via
     #   history4feed (pyproject.toml)
     #   lxml
