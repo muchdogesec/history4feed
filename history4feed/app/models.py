@@ -16,7 +16,7 @@ from django.db.models import F
 from django.utils import timezone
 from django.db import transaction
 
-POST_DESCRIPTION_MAX_LENGTH = 2 * 1024 * 1024 # 2MiB
+POST_DESCRIPTION_MAX_LENGTH = 4 * 1024 * 1024 # 4MiB
 FEED_DESCRIPTION_MAX_LENGTH = 10*1024 # 10KiB
 
 class JobState(models.TextChoices):
