@@ -112,6 +112,8 @@ def test_list_posts(client, feed_posts, api_schema):
 
         assert response.status_code == status.HTTP_200_OK
         assert len(response.json()["posts"]) == 2  # Pagination applied
+        for post in response.json()["posts"]:
+            assert "description" not in post, "description should not be in the response"
         mock_filter.assert_called_once()
         api_schema['/api/v1/posts/']['GET'].validate_response(Transport.get_st_response(response))
 
@@ -125,9 +127,38 @@ def test_retrieve_post(client, feed_posts, api_schema):
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["id"] == str(post.id)
+    assert "description" not in response.json(), "description should not be in the response"
     api_schema['/api/v1/posts/{post_id}/']['GET'].validate_response(Transport.get_st_response(response))
 
 
+@pytest.mark.django_db
+def test_html_endpoint_returns_description(client, feed_posts, api_schema):
+    """Test that /html endpoint returns the post's description with text/html content type"""
+    _, (post, _) = feed_posts
+    
+    # Set a description for the post
+    post.description = "<html><body><h1>This is the post content</h1></body></html>"
+    post.save()
+    
+    url = f"/api/v1/posts/{post.id}/html/"
+    response = client.get(url)
+    
+    assert response.status_code == status.HTTP_200_OK
+    assert response['Content-Type'] == 'text/html'
+    assert response.content.decode() == post.description
+    api_schema['/api/v1/posts/{post_id}/html/']['GET'].validate_response(Transport.get_st_response(response))
+
+@pytest.mark.django_db
+def test_html_endpoint_not_found(client, api_schema):
+    """Test that /html endpoint returns 404 for non-existent post"""
+    import uuid
+    non_existent_id = uuid.uuid4()
+    
+    url = f"/api/v1/posts/{non_existent_id}/html/"
+    response = client.get(url)
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    api_schema['/api/v1/posts/{post_id}/html/']['GET'].validate_response(Transport.get_st_response(response))
 
 def test_class_variables():
     assert PostOnlyView.ordering_fields == [

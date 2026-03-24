@@ -186,6 +186,19 @@ class ErrorResp(Response):
         },
         request=PostPatchSerializer,
     ),
+    html=extend_schema(
+        summary="Get the HTML content of a Post",
+        description=textwrap.dedent(
+            """
+            This endpoint will return the HTML content of a Post's `description` field. This is useful if you want to render the content of the post in a browser or other HTML rendering environment.
+            """
+        ),
+        responses={
+            (200, "text/html"): OpenApiResponse(OpenApiTypes.STR, "HTML content of the post"),
+            404: OpenApiResponse(CommonErrorSerializer, "post does not exist", examples=[HTTP404_EXAMPLE]),
+        },
+
+    )
 
 )
 class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -248,6 +261,12 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
         post: Post = self.get_object()
         job_obj = task_helper.new_patch_posts_job(post.feed, [post])
         return post, job_obj
+
+    @decorators.action(detail=True, methods=['GET'])
+    def html(self, request, *args, **kwargs):
+        """Return the HTML description of a post"""
+        post = self.get_object()
+        return HttpResponse(post.description, content_type="text/html")
 
     def destroy(self, *args, **kwargs):
         obj = self.get_object()

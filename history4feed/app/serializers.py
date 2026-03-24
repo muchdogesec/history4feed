@@ -94,8 +94,8 @@ class PostSerializer(serializers.ModelSerializer):
     class Meta:
         list_serializer_class = PostListSerializer
         model = Post
-        exclude = ['feed', 'deleted_manually']
-        read_only_fields = ["id", "datetime_updated", "datetime_added", "description", "is_full_text", "content_type", "added_manually"]
+        exclude = ['feed', 'deleted_manually', 'description']
+        read_only_fields = ["id", "datetime_updated", "datetime_added", "is_full_text", "content_type", "added_manually"]
         
     
     def run_validation(self, data=...):
