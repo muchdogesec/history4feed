@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import UTC
 import time
 from io import BytesIO, StringIO
 from xml.dom.minidom import Element, parse
@@ -143,7 +144,10 @@ def get_publish_date(item):
     published = getFirstElementByTag(item, "published")
     if not published:
         published = getFirstElementByTag(item, "pubDate")
-    return parse_date(getText(published))
+    date = parse_date(getText(published))
+    if not date.tzinfo:
+        date = date.replace(tzinfo=UTC)
+    return date.astimezone(UTC)
 
 def get_categories(entry: Element) -> list[str]:
     categories = []
