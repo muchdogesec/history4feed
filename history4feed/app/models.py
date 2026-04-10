@@ -184,6 +184,13 @@ class Post(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["link", "feed"], name="unique_link_by_feed"),
         ]
+        indexes = [
+            models.Index(fields=["pubdate"], condition=models.Q(deleted_manually=False), name="h4f_pubdate_visible"),
+            models.Index(fields=["id", "deleted_manually"], name="h4f_deleted_manually_with_pkey"),
+            models.Index(fields=["datetime_added"], condition=models.Q(deleted_manually=False), name="h4f_datetime_added"),
+            models.Index(fields=["datetime_updated"], condition=models.Q(deleted_manually=False), name="h4f_datetime_updated"),
+            models.Index(fields=["title"], condition=models.Q(deleted_manually=False), name="h4f_title_visible"),
+        ]
 
     def add_categories(self, categories):
         categories = categories or []
