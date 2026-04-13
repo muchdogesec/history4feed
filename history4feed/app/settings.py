@@ -15,6 +15,7 @@ H4F_DEFAULTS: dict[str, any] = {
     'HISTORY4FEED_NAMESPACE': uuid.UUID("6c6e6448-04d4-42a3-9214-4f0f7d02694e"),
     "BRAVE_SEARCH_API_KEY": None,
     "FULLTEXT_FETCH_TIMEOUT_SECONDS": 100, # time limit for fulltext fetch tasks
+    "CREATE_POSTS_MAX_LENGTH": 100, # maximum number of posts that can be created in a single request
 }
 
 IMPORT_STRINGS = [
@@ -28,7 +29,7 @@ class History4FeedServerSettings(APISettings):
     HISTORY4FEED_NAMESPACE : str|uuid.UUID
     BRAVE_SEARCH_API_KEY: str
     FULLTEXT_FETCH_TIMEOUT_SECONDS: int
-
+    CREATE_POSTS_MAX_LENGTH: int
     @property
     def user_settings(self):
         if not hasattr(self, '_user_settings'):

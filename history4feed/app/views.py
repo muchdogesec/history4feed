@@ -56,6 +56,7 @@ from django.db.models import Count, Q, Subquery, OuterRef
 from datetime import datetime
 import textwrap
 import django.utils
+from django.db import transaction
 
 from history4feed.app import serializers
 
@@ -679,6 +680,7 @@ class feed_post_view(
         },
         request=CreatePostsSerializer,
     )
+    @transaction.atomic
     def create(self, request, *args, feed_id=None, **kwargs):
         job_obj = self.new_create_post_job(request, feed_id)
         job_resp = JobSerializer(job_obj).data.copy()

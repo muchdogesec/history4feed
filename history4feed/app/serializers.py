@@ -2,6 +2,8 @@ from rest_framework import serializers, validators, exceptions
 from .models import AUTO_TITLE_TRAIL, FEED_DESCRIPTION_MAX_LENGTH, Category, Feed, Post, Job, normalize_url, FeedType, title_as_string
 from django.db import models as django_models
 from django.utils.translation import gettext_lazy as _
+from .settings import history4feed_server_settings
+
 
 class TitleField(serializers.CharField):
     def to_internal_value(self, data):
@@ -155,7 +157,7 @@ class PostPatchSerializer(PostSerializer):
 
     
 class CreatePostsSerializer(serializers.Serializer):
-    posts = serializers.ListField(child=PostCreateSerializer(), allow_empty=False)
+    posts = serializers.ListField(child=PostCreateSerializer(), allow_empty=False, max_length=history4feed_server_settings.CREATE_POSTS_MAX_LENGTH)
 
 
     def create(self, validated_data):
