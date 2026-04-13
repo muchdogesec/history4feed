@@ -26,6 +26,52 @@ def test_create_posts_serializer__existing_url(feed_posts):
     assert serializer.errors['posts'][0]['link'][0] == f'Post at `{post.link}` already exists in feed.'
 
 
+@pytest.mark.django_db
+def test_create_posts_serializer__CREATE_POSTS_MAX_LENGTH():
+    """Test that CreatePostsSerializer uses CREATE_POSTS_MAX_LENGTH from settings"""
+    from history4feed.app.settings import history4feed_server_settings
+    from unittest.mock import patch
+    import importlib
+    
+    # Mock the settings value before the serializer class is evaluated
+    with patch.object(history4feed_server_settings, 'CREATE_POSTS_MAX_LENGTH', 2):
+        # Reload the serializers module so it picks up the mocked value
+        import history4feed.app.serializers as serializers_module
+        importlib.reload(serializers_module)
+        
+        # Now create the serializer with 3 posts (exceeds limit of 2)
+        serializer = serializers_module.CreatePostsSerializer(data={
+            "posts": [
+                {
+                    "title": "Post 1",
+                    "link": "https://example.com/post1",
+                    "pubdate": datetime.now(UTC).isoformat(),
+                    "author": "Author",
+                    "categories": ["Category1"],
+                },
+                {
+                    "title": "Post 2",
+                    "link": "https://example.com/post2",
+                    "pubdate": datetime.now(UTC).isoformat(),
+                    "author": "Author",
+                    "categories": ["Category2"],
+                },
+                {
+                    "title": "Post 3",
+                    "link": "https://example.com/post3",
+                    "pubdate": datetime.now(UTC).isoformat(),
+                    "author": "Author",
+                    "categories": ["Category3"],
+                }
+            ]
+        })
+        
+        assert not serializer.is_valid()
+        assert 'posts' in serializer.errors
+        assert 'Ensure this field has no more than 2' in str(serializer.errors['posts'][0])
+    
+    # Reload again to restore the original module state
+    importlib.reload(serializers_module)
 
 @pytest.mark.django_db
 def test_post_serializer_excludes_description():
