@@ -81,15 +81,25 @@ def new_patch_posts_job(
         include_remote_blogs=include_remote_blogs,
         extra_data=dict(use_scrapfly_asp=feed.use_scrapfly_asp),
     )
-    ft_jobs = [
-        models.FulltextJob.objects.create(
+    task = create_celery_tasks_for_post_patch.si(job_obj.id, [p.id for p in posts])
+    task.stamp(job_id=str(job_obj.id))
+    task.apply_async(link_error=error_handler.s(job_obj.pk))
+    return job_obj
+
+
+@shared_task
+def create_celery_tasks_for_post_patch(job_id, post_ids):
+    job_obj = models.Job.objects.get(pk=job_id)
+    ft_jobs = []
+    for post_id in post_ids:
+        post = models.Post.objects.get(pk=post_id)
+        ft_job = models.FulltextJob.objects.create(
             job_id=job_obj.id,
             post_id=post.id,
             link=post.link,
         )
-        for post in posts
-    ]
-    chain = celery.chain([retrieve_full_text.si(ft_job.pk) for ft_job in ft_jobs])
+        ft_jobs.append(retrieve_full_text.si(ft_job.pk))
+    chain = celery.chain(ft_jobs)
     chain.stamp(job_id=str(job_obj.id))
     task = (
         start_post_job.si(job_obj.id)
@@ -98,7 +108,6 @@ def new_patch_posts_job(
     )
     task.stamp(job_id=str(job_obj.id))
     task.apply_async(link_error=error_handler.s(job_obj.pk), countdown=5)
-    return job_obj
 
 
 @shared_task(bind=True, default_retry_delay=10)
