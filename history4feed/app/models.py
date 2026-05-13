@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import UTC, datetime
+import logging
 import re
 from textwrap import dedent
 from typing import Iterable
@@ -156,7 +157,7 @@ class Job(models.Model):
     
     @property
     def has_failures(self):
-        return self.state == JobState.FAILED or self.fulltext_jobs.filter(status__in=[FullTextState.FAILED, FullTextState.TIMED_OUT]).exists() or self.feed_url_fails
+        return self.fulltext_jobs.filter(status__in=[FullTextState.FAILED, FullTextState.TIMED_OUT]).exists() or self.feed_url_fails
     
     @property
     def feed_url_fails(self):
@@ -213,6 +214,10 @@ class Post(models.Model):
         if not self.id:
             pubdate = self.pubdate.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             self.id = stix_id(f"{self.feed.id}+{self.link}+{pubdate}")
+            
+        if len(self.title) > 300:
+            logging.warning("truncating title to 300 characters: %s", self.title)
+            self.title = self.title[:300]
         return super().save(*args, **kwargs)
     
     @classmethod

@@ -298,10 +298,6 @@ def add_post_to_db(db_feed: models.Feed, job: models.Job, post_dict: h4f.PostDic
     categories = post_dict.categories
     del post_dict.categories
     try:
-        if len(post_dict.title) > 300:
-            logger.warning("truncating title to 300 characters: %s", post_dict.title)
-            post_dict.title = post_dict.title[:300]
-
         post, created = models.Post.objects.get_or_create(
             defaults=post_dict.__dict__, feed=db_feed, link=post_dict.link
         )
