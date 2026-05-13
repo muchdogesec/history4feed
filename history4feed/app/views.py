@@ -228,12 +228,10 @@ class PostOnlyView(mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.Ge
             lookup_expr="icontains",
         )
         job_id = Filter(help_text="Filter the results by the Job ID the Post was downloaded or updated in. e.g. `6606bd0c-9d9d-4ffd-81bb-81c9196ccfe6`", field_name="fulltext_jobs__job_id")
-        job_state = filters.ChoiceFilter(choices=JobState.choices, help_text="Filter by job status")
         updated_after = DatetimeFilter(help_text="Only show posts with a `datetime_updated` after the time specified. It must be in `YYYY-MM-DD HH:MM[:ss[.uuuuuu]][TZ]`, e.g. `2020-01-01 00:00`", field_name="datetime_updated", lookup_expr="gt")
 
     def get_queryset(self):
-        return Post.visible_posts() \
-                .annotate(job_state=Subquery(Job.objects.filter(pk=OuterRef('last_job_id')).values('state')[:1]))
+        return Post.visible_posts()
     
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()

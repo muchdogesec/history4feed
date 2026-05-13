@@ -3,8 +3,8 @@ import pytest
 
 from datetime import UTC, datetime
 import uuid
-from history4feed.app.models import Feed, Post
-from history4feed.app.serializers import PostSerializer, PostWithFeedIDSerializer, CreatePostsSerializer
+from history4feed.app.models import Feed, Post, FulltextJob, FullTextState
+from history4feed.app.serializers import PostSerializer, PostWithFeedIDSerializer, CreatePostsSerializer, JobSerializer
 
 
 @pytest.mark.django_db
@@ -159,3 +159,39 @@ def test_post_serializer_includes_other_fields():
     assert 'pubdate' in data
     assert 'datetime_added' in data
     assert 'datetime_updated' in data
+
+
+@pytest.mark.django_db
+def test_job_serializer__serializes_url(jobs):
+    job = jobs[0]
+    job.run_datetime = datetime(2020, 1, 1, 12, 12, 12, tzinfo=UTC)
+    job.save()
+    FulltextJob.objects.create(job=job, status=FullTextState.FAILED, error_str='failed for no reason', link='http://example.co/1')
+    FulltextJob.objects.create(job=job, status=FullTextState.RETRIEVED, error_str='was successful, will not be shown', link='http://example.co/1')
+    s = JobSerializer(job)
+    assert s.data == {
+        "id": str(job.id),
+        "feed_id": str(job.feed_id),
+        "urls": {
+            "retrieved": [{"url": "http://example.co/1", "id": None}],
+            "retrieving": [],
+            "skipped": [],
+            "failed": [
+                {
+                    "url": "http://example.co/1",
+                    "id": None,
+                    "error": "failed for no reason",
+                }
+            ],
+            "cancelled": [],
+            "timed_out": [],
+        },
+        "state": "pending",
+        "run_datetime": "2020-01-01T12:12:12Z",
+        "earliest_item_requested": None,
+        "latest_item_requested": None,
+        "info": "",
+        "include_remote_blogs": False,
+        "completion_time": None,
+        "extra_data": {},
+    }

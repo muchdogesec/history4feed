@@ -1,4 +1,6 @@
+from collections import defaultdict
 from datetime import UTC, datetime
+import logging
 import re
 from textwrap import dedent
 from typing import Iterable
@@ -124,11 +126,10 @@ class Job(models.Model):
     extra_data = models.JSONField(default=dict, help_text="extra data for the job", blank=True)
 
     def urls(self):
-        retval = {}
+        retval = defaultdict(list)
         ft_job: FulltextJob = None
         for ft_job in self.fulltext_jobs.all():
-            retval[ft_job.status] = retval.get(ft_job.status, [])
-            retval[ft_job.status].append(dict(url=ft_job.link, id=ft_job.post_id))
+            retval[ft_job.status].append(dict(url=ft_job.link, id=ft_job.post_id, error=ft_job.error_str))
         return retval
     
     def should_skip_post(self, post_link: str):
@@ -153,6 +154,17 @@ class Job(models.Model):
         obj.save()
         self.refresh_from_db()
         return obj.state
+    
+    @property
+    def has_failures(self):
+        return self.fulltext_jobs.filter(status__in=[FullTextState.FAILED, FullTextState.TIMED_OUT]).exists() or self.feed_url_fails
+    
+    @property
+    def feed_url_fails(self):
+        for process in self.extra_data.get('feed_urls', []):
+            if process['state'] == 'failed':
+                return True
+        return False
     
 
 
@@ -202,6 +214,10 @@ class Post(models.Model):
         if not self.id:
             pubdate = self.pubdate.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             self.id = stix_id(f"{self.feed.id}+{self.link}+{pubdate}")
+            
+        if len(self.title) > 300:
+            logging.warning("truncating title to 300 characters: %s", self.title)
+            self.title = self.title[:300]
         return super().save(*args, **kwargs)
     
     @classmethod
