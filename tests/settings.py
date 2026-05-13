@@ -5,3 +5,5 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.dummy.DummyCache",
     }
 }
+
+HISTORY4FEED_SETTINGS.update(SCRAPFLY_APIKEY='')

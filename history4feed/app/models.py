@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import UTC, datetime
 import re
 from textwrap import dedent
@@ -124,11 +125,10 @@ class Job(models.Model):
     extra_data = models.JSONField(default=dict, help_text="extra data for the job", blank=True)
 
     def urls(self):
-        retval = {}
+        retval = defaultdict(list)
         ft_job: FulltextJob = None
         for ft_job in self.fulltext_jobs.all():
-            retval[ft_job.status] = retval.get(ft_job.status, [])
-            retval[ft_job.status].append(dict(url=ft_job.link, id=ft_job.post_id))
+            retval[ft_job.status].append(dict(url=ft_job.link, id=ft_job.post_id, error=ft_job.error_str))
         return retval
     
     def should_skip_post(self, post_link: str):

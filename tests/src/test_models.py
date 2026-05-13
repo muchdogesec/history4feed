@@ -73,3 +73,10 @@ def test_update_state_behavior(jobs, original_state, new_state, expected_state, 
         assert job.completion_time is not None
     else:
         assert job.completion_time is None
+
+
+@pytest.mark.django_db
+def test_job_urls_includes_error_for_failed_retrieves(jobs):
+    job = jobs[0]
+    models.FulltextJob.objects.create(job=job, status=models.FullTextState.FAILED, error_str='failed for no reason', link='http://example.co/1')
+    assert job.urls()['failed'] == [{'error': 'failed for no reason', 'id': None, 'url': 'http://example.co/1'}]

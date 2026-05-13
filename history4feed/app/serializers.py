@@ -176,10 +176,12 @@ class JobUrlStatusSerializer(serializers.Serializer):
     class joburlstatus(serializers.Serializer):
         url = serializers.URLField()
         id = serializers.UUIDField()
+    class joburlerror(joburlstatus):
+        error = serializers.CharField()
     retrieved = joburlstatus(many=True, default=[])
     retrieving = joburlstatus(many=True, default=[])
     skipped   = joburlstatus(many=True, default=[])
-    failed    = joburlstatus(many=True, default=[])
+    failed    = joburlerror(many=True, default=[])
     cancelled = joburlstatus(many=True, default=[])
     timed_out = joburlstatus(many=True, default=[])
 

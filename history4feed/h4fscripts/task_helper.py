@@ -20,74 +20,99 @@ from django.db import transaction
 
 LOCK_EXPIRE = 60 * 60
 
+
 def get_lock_id(feed: models.Feed):
     lock_id = f"feed-lock-{feed.id}"
     logger.debug("using lock id %s", lock_id)
     return lock_id
 
+
 def queue_lock(feed: models.Feed, job=None):
     lock_value = dict(feed_id=str(feed.id))
     if job:
         lock_value["job_id"] = str(job.id)
-        
+
     status = cache.add(get_lock_id(feed), lock_value, timeout=LOCK_EXPIRE)
     return status
 
 
 @transaction.atomic()
-def new_job(feed: models.Feed, include_remote_blogs, use_feed_url_only, force_full_fetch=True):
+def new_job(
+    feed: models.Feed, include_remote_blogs, use_feed_url_only, force_full_fetch=True
+):
     earliest_item_requested = feed.latest_item_pubdate
     if feed.feed_type == models.FeedType.SEARCH_INDEX:
         earliest_item_requested = feed.freshness
     earliest_item_requested = earliest_item_requested or settings.EARLIEST_SEARCH_DATE
     if force_full_fetch:
         earliest_item_requested = settings.EARLIEST_SEARCH_DATE
-    
+
     job_obj = models.Job.objects.create(
         feed=feed,
         earliest_item_requested=earliest_item_requested,
         latest_item_requested=datetime.now(UTC),
         include_remote_blogs=include_remote_blogs,
-        extra_data=dict(force_full_fetch=force_full_fetch, use_feed_url_only=use_feed_url_only, use_scrapfly_asp=feed.use_scrapfly_asp),
+        extra_data=dict(
+            force_full_fetch=force_full_fetch,
+            use_feed_url_only=use_feed_url_only,
+            use_scrapfly_asp=feed.use_scrapfly_asp,
+        ),
     )
     if not queue_lock(feed, job_obj):
-        raise Throttled(detail={"message": "A job is already running for this feed", **cache.get(get_lock_id(feed))})
+        raise Throttled(
+            detail={
+                "message": "A job is already running for this feed",
+                **cache.get(get_lock_id(feed)),
+            }
+        )
 
-    task = (start_job.s(job_obj.pk) | retrieve_posts_from_links.s(job_obj.pk))
+    task = start_job.s(job_obj.pk) | retrieve_posts_from_links.s(job_obj.pk)
     task.stamp(job_id=str(job_obj.id))
     task.apply_async(countdown=5, link_error=error_handler.s(job_obj.pk))
     return job_obj
 
-def new_patch_posts_job(feed: models.Feed, posts: list[models.Post], include_remote_blogs=True):
+
+def new_patch_posts_job(
+    feed: models.Feed, posts: list[models.Post], include_remote_blogs=True
+):
     job_obj = models.Job.objects.create(
         feed=feed,
         state=models.JobState.PENDING,
         include_remote_blogs=include_remote_blogs,
         extra_data=dict(use_scrapfly_asp=feed.use_scrapfly_asp),
     )
-    ft_jobs = [models.FulltextJob.objects.create(
-        job_id=job_obj.id,
-        post_id=post.id,
-        link=post.link,
-    ) for post in posts]
+    ft_jobs = [
+        models.FulltextJob.objects.create(
+            job_id=job_obj.id,
+            post_id=post.id,
+            link=post.link,
+        )
+        for post in posts
+    ]
     chain = celery.chain([retrieve_full_text.si(ft_job.pk) for ft_job in ft_jobs])
     chain.stamp(job_id=str(job_obj.id))
-    task = ( start_post_job.si(job_obj.id) | chain | collect_and_schedule_removal.si(job_obj.pk))
+    task = (
+        start_post_job.si(job_obj.id)
+        | chain
+        | collect_and_schedule_removal.si(job_obj.pk)
+    )
     task.stamp(job_id=str(job_obj.id))
     task.apply_async(link_error=error_handler.s(job_obj.pk), countdown=5)
     return job_obj
+
 
 @shared_task(bind=True, default_retry_delay=10)
 def start_post_job(self: CeleryTask, job_id):
     job = models.Job.objects.get(pk=job_id)
     if job.is_cancelled():
         job.info = "job cancelled while in queue"
-        job.save(update_fields=['info'])
+        job.save(update_fields=["info"])
         return False
     if not queue_lock(job.feed, job):
         return self.retry(max_retries=360)
     job.update_state(models.JobState.RUNNING)
     return True
+
 
 @shared_task(soft_time_limit=600, time_limit=800)
 def start_job(job_id):
@@ -95,15 +120,19 @@ def start_job(job_id):
     feed = job.feed
     job.update_state(models.JobState.RUNNING)
     try:
-        if feed.feed_type == models.FeedType.SEARCH_INDEX or job.extra_data["use_feed_url_only"]:
+        if (
+            feed.feed_type == models.FeedType.SEARCH_INDEX
+            or job.extra_data["use_feed_url_only"]
+        ):
             return [feed.url]
-        return wayback_helpers.get_wayback_urls(feed.url, job.earliest_item_requested, job.latest_item_requested)
+        return wayback_helpers.get_wayback_urls(
+            feed.url, job.earliest_item_requested, job.latest_item_requested
+        )
     except BaseException as e:
         job.update_state(models.JobState.FAILED)
         job.info = str(e)
-        job.save(update_fields=['info'])
+        job.save(update_fields=["info"])
         return []
-
 
 
 @shared_task(bind=True)
@@ -115,76 +144,84 @@ def retrieve_posts_from_links(self, urls, job_id):
     chains = []
     parsed_feed = {}
     job = models.Job.objects.get(id=job_id)
-    job.extra_data["urls"] = [dict(link=url, state='queued', posts_added=0) for url in urls]
-    job.save(update_fields=['extra_data'])
+    job.extra_data["feed_urls"] = [
+        dict(link=url, state="queued", posts_added=0) for url in urls
+    ]
+    job.save(update_fields=["extra_data"])
     for index, url in enumerate(urls):
         if job.is_cancelled():
             break
-        job.extra_data["urls"][index]['state'] = 'processing'
-        job.save(update_fields=['extra_data'])
+        job.extra_data["feed_urls"][index]["state"] = "processing"
+        job.save(update_fields=["extra_data"])
         error = None
         if feed.feed_type == models.FeedType.SEARCH_INDEX:
             posts = retrieve_posts_from_serper(feed, job, url)
         else:
             parsed_feed, posts, error = retrieve_posts_from_url(url, feed, job)
+        feed_url_data = job.extra_data["feed_urls"][index]
         if error:
             logger.exception(error)
-            job.extra_data["urls"][index]['state'] = 'failed'
-            job.save(update_fields=['extra_data'])
-            continue
+            feed_url_data.update(state="failed", error=str(error))
+        else:
+            feed_url_data.update(
+                state="completed",
+            )
         if not posts:
-            job.extra_data["urls"][index]['state'] = 'completed'
-            job.save(update_fields=['extra_data'])
-            logger.warning('no new post in `%s`', url)
+            logger.warning("no new post in `%s`", url)
+            job.save(update_fields=["extra_data"])
             continue
-        job.extra_data["urls"][index]['state'] = 'completed'
-        job.extra_data["urls"][index]['posts_added'] = len(posts)
-        job.save(update_fields=['extra_data'])
-
+        feed_url_data["posts_added"] = len(posts)
+        job.save(update_fields=["extra_data"])
         full_text_chain = create_fulltexts_task_chain(job_id, posts)
         full_text_chain.stamp(job_id=str(job_id))
         chains.append(full_text_chain)
 
     if parsed_feed:
-        feed.set_description(parsed_feed['description'])
-        feed.set_title(parsed_feed['title'])
+        feed.set_description(parsed_feed["description"])
+        feed.set_title(parsed_feed["title"])
     feed.freshness = job.run_datetime
-    
+
     feed.save()
-    logger.info("====\n"*5)
-    
+    logger.info("====\n" * 5)
+
     callback = collect_and_schedule_removal.si(job_id)
     if chains:
         return self.replace(celery.chord(chains, callback))
     return self.replace(callback)
 
+
 def create_fulltexts_task_chain(job_id, posts):
     chain_tasks = []
     for post in posts:
         ftjob_entry = models.FulltextJob.objects.create(
-                job_id=job_id,
-                post_id=post.id,
-                link=post.link,
-            )
+            job_id=job_id,
+            post_id=post.id,
+            link=post.link,
+        )
         task = retrieve_full_text.si(ftjob_entry.pk)
         task.stamp(job_id=str(job_id))
         chain_tasks.append(task)
-        
+
     return celery.chain(chain_tasks)
+
 
 def retrieve_posts_from_serper(feed: models.Feed, job: models.Job, url: str):
     start_time = job.earliest_item_requested
     if not start_time.tzinfo:
         start_time = start_time.replace(tzinfo=UTC)
-    crawled_posts = fetch_posts_links_with_serper(url, from_time=start_time, to_time=job.run_datetime)
+    crawled_posts = fetch_posts_links_with_serper(
+        url, from_time=start_time, to_time=job.run_datetime
+    )
     posts = []
     for post_dict in crawled_posts.values():
         if post := add_post_to_db(feed, job, post_dict):
             posts.append(post)
     return posts
 
+
 class JobCancelled(Exception):
     pass
+
 
 @shared_task(bind=True)
 def collect_and_schedule_removal(sender, job_id):
@@ -194,18 +231,20 @@ def collect_and_schedule_removal(sender, job_id):
     if job.state == models.JobState.RUNNING:
         job.update_state(models.JobState.SUCCESS)
 
+
 def remove_lock(job):
     if cache.delete(get_lock_id(job.feed)):
         logger.debug("lock deleted")
     else:
         logger.debug("Failed to remove lock")
 
+
 def retrieve_posts_from_url(url, db_feed: models.Feed, job: models.Job):
     back_off_seconds = settings.WAYBACK_SLEEP_SECONDS
     all_posts: list[models.Post] = []
-    error = None
     parsed_feed = {}
     for i in range(settings.REQUEST_RETRY_COUNT):
+        error = None
         if i != 0:
             time.sleep(back_off_seconds)
         try:
@@ -213,13 +252,17 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job: models.Job):
                 raise JobCancelled("job was terminated by user")
             data, content_type, url = h4f.fetch_page_with_retries(url)
             parsed_feed = h4f.parse_feed_from_content(data, url)
-            match parsed_feed['feed_type']:
+            match parsed_feed["feed_type"]:
                 case models.FeedType.ATOM:
                     posts = h4f.parse_posts_from_atom_feed(url, data)
                 case models.FeedType.RSS:
                     posts = h4f.parse_posts_from_rss_feed(url, data)
                 case _:
-                    raise exceptions.UnknownFeedtypeException("unknown feed type `{}` at {}".format(parsed_feed['feed_type'], url))
+                    raise exceptions.UnknownFeedtypeException(
+                        "unknown feed type `{}` at {}".format(
+                            parsed_feed["feed_type"], url
+                        )
+                    )
             for post_dict in posts.values():
                 # make sure that post and feed share the same domain
                 post = add_post_to_db(db_feed, job, post_dict)
@@ -227,12 +270,14 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job: models.Job):
                     continue
                 all_posts.append(post)
             db_feed.save()
-            logger.info(f"saved {len(posts)} posts for {url}")
+            logger.info(f"saved {len(all_posts)} posts for {url}")
             break
         except ConnectionError as e:
             logger.error(e, exc_info=True)
             error = e
-            logger.info(f"job with url {url} ran into an issue {e}, backing off for {back_off_seconds} seconds")
+            logger.info(
+                f"job with url {url} ran into an issue {e}, backing off for {back_off_seconds} seconds"
+            )
             back_off_seconds *= 1.2
         except BaseException as e:
             logger.error(e, exc_info=True)
@@ -240,27 +285,50 @@ def retrieve_posts_from_url(url, db_feed: models.Feed, job: models.Job):
             break
     return parsed_feed, all_posts, error
 
+
 def add_post_to_db(db_feed: models.Feed, job: models.Job, post_dict: h4f.PostDict):
     # make sure that post and feed share the same domain
     if job.should_skip_post(post_dict.link):
         models.FulltextJob.objects.create(
-                job_id=job.id,
-                status=models.FullTextState.SKIPPED,
-                link=post_dict.link,
+            job_id=job.id,
+            status=models.FullTextState.SKIPPED,
+            link=post_dict.link,
         )
         return None
     categories = post_dict.categories
     del post_dict.categories
-    post, created = models.Post.objects.get_or_create(defaults=post_dict.__dict__, feed=db_feed, link=post_dict.link)
-    if not created or post.deleted_manually:
+    try:
+        if len(post_dict.title) > 300:
+            logger.warning("truncating title to 300 characters: %s", post_dict.title)
+            post_dict.title = post_dict.title[:300]
+
+        post, created = models.Post.objects.get_or_create(
+            defaults=post_dict.__dict__, feed=db_feed, link=post_dict.link
+        )
+        if not created or post.deleted_manually:
+            return None
+
+        post.save()
+        post.add_categories(categories)
+        return post
+    except Exception as e:
+        logger.error(
+            f"failed to add post to db. post_dict: {post_dict}, feed_id: {db_feed.id}, job_id: {job.id}",
+            exc_info=True,
+        )
+        models.FulltextJob.objects.create(
+            job_id=job.id,
+            status=models.FullTextState.FAILED,
+            error_str=f"add post to db failed: {e}",
+            link=post_dict.link,
+        )
         return None
 
-    post.save()
-    post.add_categories(categories)
-    return post
-        
 
-@shared_task(soft_time_limit=settings.FULLTEXT_FETCH_TIMEOUT_SECONDS, time_limit=settings.FULLTEXT_FETCH_TIMEOUT_SECONDS + 20)
+@shared_task(
+    soft_time_limit=settings.FULLTEXT_FETCH_TIMEOUT_SECONDS,
+    time_limit=settings.FULLTEXT_FETCH_TIMEOUT_SECONDS + 20,
+)
 def retrieve_full_text(ftjob_pk):
     fulltext_job = models.FulltextJob.objects.get(pk=ftjob_pk)
     use_scrapfly_asp = fulltext_job.job.extra_data["use_scrapfly_asp"]
@@ -268,7 +336,11 @@ def retrieve_full_text(ftjob_pk):
         if fulltext_job.is_cancelled():
             raise JobCancelled()
         else:
-            fulltext_job.post.description, fulltext_job.post.content_type = h4f.get_full_text(fulltext_job.post.link, use_scrapfly_asp=use_scrapfly_asp)
+            fulltext_job.post.description, fulltext_job.post.content_type = (
+                h4f.get_full_text(
+                    fulltext_job.post.link, use_scrapfly_asp=use_scrapfly_asp
+                )
+            )
             fulltext_job.status = models.FullTextState.RETRIEVED
             fulltext_job.error_str = ""
             fulltext_job.post.is_full_text = True
@@ -287,16 +359,27 @@ def retrieve_full_text(ftjob_pk):
 
 
 from celery import signals
+
+
 @signals.worker_ready.connect
 def mark_old_jobs_as_failed(**kwargs):
-    models.Job.objects.filter(state__in=[models.JobState.PENDING, models.JobState.RUNNING]).update(state=models.JobState.CANCELLED, info="job cancelled automatically on server startup")
+    models.Job.objects.filter(
+        state__in=[models.JobState.PENDING, models.JobState.RUNNING]
+    ).update(
+        state=models.JobState.CANCELLED,
+        info="job cancelled automatically on server startup",
+    )
+
 
 @shared_task
 def error_handler(request, exc: Exception, traceback, job_id):
     job = models.Job.objects.get(pk=job_id)
     job.update_state(models.JobState.FAILED)
     job.info = f"job failed: {exc}"
-    job.save(update_fields=['info'])
+    job.save(update_fields=["info"])
     remove_lock(job)
-    logger.error('Job {3} with task_id {0} raised exception: {1!r}\n{2!r}'.format(
-          request.id, exc, traceback, job_id))
+    logger.error(
+        "Job {3} with task_id {0} raised exception: {1!r}\n{2!r}".format(
+            request.id, exc, traceback, job_id
+        )
+    )

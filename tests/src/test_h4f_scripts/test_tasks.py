@@ -22,6 +22,7 @@ from history4feed.h4fscripts.task_helper import (
 )
 from rest_framework.exceptions import APIException, Throttled
 from datetime import UTC, datetime as dt
+from .rss_data import atom_example
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -479,8 +480,6 @@ def test_retrieve_posts_from_url():
     pass
 
 
-
-
 @pytest.fixture
 def dummy_feed():
     return MagicMock(spec=Feed)
@@ -571,6 +570,34 @@ def test_retrieve_posts_connection_error_retries(mock_sleep, mock_fetch, dummy_f
     assert parsed_feed == {}
     assert all_posts == []
     assert isinstance(error, ConnectionError)
+    assert mock_fetch.call_count == 3
+    assert mock_sleep.call_count == 2  # called only after the first attempt fails
+
+
+@patch("history4feed.h4fscripts.task_helper.h4f.fetch_page_with_retries")
+@patch("history4feed.h4fscripts.task_helper.add_post_to_db")
+@patch("time.sleep")
+def test_retrieve_posts_connection_error_successful_after_retry(mock_sleep, mock_add_post, mock_fetch, dummy_feed, dummy_job, settings):
+    settings.REQUEST_RETRY_COUNT = 3
+    settings.WAYBACK_SLEEP_SECONDS = 1
+    url = "https://retry.fail"
+
+    mock_fetch.side_effect = [
+        ConnectionError("Timeout"),
+        ConnectionError("Timeout"),
+        (atom_example.encode("utf-8"), "text/xml", url)
+    ]
+
+    parsed_feed, all_posts, error = retrieve_posts_from_url(url, dummy_feed, dummy_job)
+    assert parsed_feed == {
+        "description": "ATOM -- Contains decoded html inside CDATA tags -- PARTIAL CONTENT ONLY",
+        "title": "Your awesome title",
+        "feed_type": "atom",
+        "url": "https://retry.fail",
+    }
+    mock_add_post.assert_called()
+    assert mock_add_post.call_count == 6
+    assert len(all_posts) == 6
     assert mock_fetch.call_count == 3
     assert mock_sleep.call_count == 2  # called only after the first attempt fails
 
@@ -682,3 +709,39 @@ def test_retrieve_full_text_hard_timeout(mock_get_job, mock_get_text, dummy_ftjo
     assert "TimeLimitExceeded" in dummy_ftjob.error_str
     dummy_ftjob.save.assert_called_once()
     dummy_ftjob.post.save.assert_called_once()
+
+@pytest.mark.django_db
+def test_add_post_to_db__logs_failure(jobs):
+    job = jobs[0]
+    job.include_remote_blogs = True
+    feed = job.feed
+
+    mdict = PostDict('http://example.com/post', '', '', '', [])
+
+    with (
+        patch(
+            "history4feed.h4fscripts.task_helper.models.Post.objects.get_or_create",
+            side_effect=ValueError('failed because of unreasonable reasons'),
+        ) as mock_get_or_create,
+    ):
+        post = add_post_to_db(feed, job, mdict)
+        assert post == None
+        ft_jobs = models.FulltextJob.objects.filter(job_id=job.id, link=mdict.link)
+        assert len(ft_jobs) == 1
+        assert ft_jobs[0].status == FullTextState.FAILED
+        assert ft_jobs[0].error_str == 'add post to db failed: failed because of unreasonable reasons'
+
+
+
+@pytest.mark.django_db
+def test_add_post_to_db__truncates_title(jobs):
+    job = jobs[0]
+    job.include_remote_blogs = True
+    feed = job.feed
+
+    orig_title = 'random bs+'*50
+    mdict = PostDict('http://example.com/post', orig_title, dt.now(UTC), '', [])
+    post = add_post_to_db(feed, job, mdict)
+    assert post.title <= orig_title
+    assert orig_title.startswith(post.title)
+    assert len(post.title) <= 300
