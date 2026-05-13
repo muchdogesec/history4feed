@@ -80,3 +80,24 @@ def test_job_urls_includes_error_for_failed_retrieves(jobs):
     job = jobs[0]
     models.FulltextJob.objects.create(job=job, status=models.FullTextState.FAILED, error_str='failed for no reason', link='http://example.co/1')
     assert job.urls()['failed'] == [{'error': 'failed for no reason', 'id': None, 'url': 'http://example.co/1'}]
+
+@pytest.mark.django_db
+def test_job__has_failures(jobs):
+    job = jobs[0]
+    assert job.has_failures is False
+
+    ftj = models.FulltextJob.objects.create(job=job, status=models.FullTextState.FAILED, error_str='failed for no reason', link='http://example.co/1')
+    assert job.has_failures is True
+    job.update_state(models.JobState.SUCCESS)
+    assert job.has_failures is True
+
+    ftj.delete()
+    assert job.has_failures is False
+
+    job.extra_data['feed_urls'] = [
+        dict(link='', state="queued", posts_added=0),
+        dict(link='', state="complete", posts_added=0),
+    ]
+    assert job.has_failures is False
+    job.extra_data['feed_urls'][0]['state'] = "failed"
+    assert job.has_failures is True

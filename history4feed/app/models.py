@@ -154,6 +154,17 @@ class Job(models.Model):
         self.refresh_from_db()
         return obj.state
     
+    @property
+    def has_failures(self):
+        return self.state == JobState.FAILED or self.fulltext_jobs.filter(status__in=[FullTextState.FAILED, FullTextState.TIMED_OUT]).exists() or self.feed_url_fails
+    
+    @property
+    def feed_url_fails(self):
+        for process in self.extra_data.get('feed_urls', []):
+            if process['state'] == 'failed':
+                return True
+        return False
+    
 
 
 class FullTextState(models.TextChoices):
