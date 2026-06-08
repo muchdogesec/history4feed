@@ -12,6 +12,7 @@ from unittest.mock import patch
 from history4feed.app.serializers import (
     FeedFetchSerializer,
     FeedPatchSerializer,
+    InvalidFeed,
     FeedSerializer,
     SearchIndexFeedSerializer,
 )
@@ -30,6 +31,7 @@ from django_filters.rest_framework import (
     DjangoFilterBackend,
 )
 
+from history4feed.h4fscripts.exceptions import UnknownFeedtypeException
 from tests.conftest import api_schema
 from tests.utils import Transport
 
@@ -68,6 +70,37 @@ def test_create_feed(client, api_schema):
         assert resp.status_code == 201
         assert str(resp.data["job_id"]) == str(job.id)
         api_schema['/api/v1/feeds/']['POST'].validate_response(Transport.get_st_response(resp))
+
+
+@pytest.mark.parametrize(
+    "side_effect, expected_status",
+    [
+        (UnknownFeedtypeException("Could not parse feed from response"), 406),
+        (UnknownFeedtypeException("Bad feed"), 406),
+        (ConnectionError("Could not fetch feed from url"), 422),
+        (ValueError("some value error"), 422),
+    ],
+)
+@pytest.mark.django_db
+def test_create_feed_error_responses(client, api_schema, side_effect, expected_status):
+    payload = dict(
+        url="https://example.com/rss.xml",
+        include_remote_blogs=False,
+    )
+
+    with patch(
+        "history4feed.app.views.h4f.parse_feed_from_url",
+        side_effect=side_effect,
+    ):
+        resp = client.post(
+            "/api/v1/feeds/",
+            data=payload,
+            content_type="application/json",
+        )
+
+    assert resp.status_code == expected_status, resp.content
+    assert str(side_effect) in str(resp.content)
+    api_schema['/api/v1/feeds/']['POST'].validate_response(Transport.get_st_response(resp))
 
 
 @pytest.mark.parametrize("include_remote_blogs", [True, False])

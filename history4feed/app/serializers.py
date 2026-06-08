@@ -14,6 +14,9 @@ class TitleField(serializers.CharField):
 class InvalidFeed(exceptions.APIException):
     status_code = 406
 
+class FeedFetchError(InvalidFeed):
+    status_code = 422
+
 class FeedSerializer(serializers.ModelSerializer):
     count_of_posts = serializers.IntegerField(source='get_post_count', read_only=True, help_text="Number of posts in feed")
     include_remote_blogs = serializers.BooleanField(write_only=True, default=False)
