@@ -180,9 +180,10 @@ def parse_feed_from_content(data: bytes, url: str):
 
 
 def get_publish_date(item):
-    published = getFirstElementByTag(item, "published")
-    if not published:
-        published = getFirstElementByTag(item, "pubDate")
+    for k in ['published', 'pubDate', 'updated']:
+        published = getFirstElementByTag(item, k)
+        if published:
+            break
     date = parse_date(getText(published))
     if not date.tzinfo:
         date = date.replace(tzinfo=UTC)

@@ -5,7 +5,7 @@ from history4feed.h4fscripts.h4f import (
     parse_posts_from_rss_feed,
 )
 from .rss_data import rss_example, atom_example
-
+from datetime import datetime, UTC
 
 @pytest.mark.parametrize(
     ["data", "url", "expected_feed_data"],
@@ -43,28 +43,67 @@ def test_parse_feed_from_content(data, url, expected_feed_data):
 def test_parse_posts_from_rss_feed():
     posts = parse_posts_from_rss_feed("https://example.blog/rss/", rss_example.encode())
     expected_links = [
-        "https://muchdogesec.github.io/fakeblog123///test1/2024/09/01/same-ioc-across-posts.html",
-        "https://muchdogesec.github.io/fakeblog123///test1/2024/08/23/obstracts-ai-relationships.html",
-        "https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-to-post-1.html",
-        "https://muchdogesec.github.io/fakeblog123///test2/2024/08/07/testing-extractions-1.html",
-        "https://muchdogesec.github.io/fakeblog123///test2/2024/08/05/testing-markdown-elements-1.html",
-        "https://muchdogesec.github.io/fakeblog123///test1/2024/08/01/real-post-example-1.html",
+        (
+            "https://muchdogesec.github.io/fakeblog123///test1/2024/09/01/same-ioc-across-posts.html",
+            datetime(2024, 9, 1, 8, 0, tzinfo=UTC),
+        ),
+        (
+            "https://muchdogesec.github.io/fakeblog123///test1/2024/08/23/obstracts-ai-relationships.html",
+            datetime(2024, 8, 23, 8, 0, tzinfo=UTC),
+        ),
+        (
+            "https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-to-post-1.html",
+            datetime(2024, 8, 20, 10, 0, tzinfo=UTC),
+        ),
+        (
+            "https://muchdogesec.github.io/fakeblog123///test2/2024/08/07/testing-extractions-1.html",
+            datetime(2024, 8, 7, 8, 0, tzinfo=UTC),
+        ),
+        (
+            "https://muchdogesec.github.io/fakeblog123///test2/2024/08/05/testing-markdown-elements-1.html",
+            datetime(2024, 8, 5, 8, 0, tzinfo=UTC),
+        ),
+        (
+            "https://muchdogesec.github.io/fakeblog123///test1/2024/08/01/real-post-example-1.html",
+            datetime(2024, 8, 1, 8, 0, tzinfo=UTC),
+        ),
     ]
-
-    assert expected_links == list(posts)
-
+    links_and_dates = [(k.link, k.pubdate) for k in posts.values()]
+    assert links_and_dates == expected_links
 
 def test_parse_posts_from_atom_feed():
     posts = parse_posts_from_atom_feed(
         "https://example.blog/rss/", atom_example.encode()
     )
     expected_links = [
-        "https://muchdogesec.github.io/fakeblog123///test1/2024/09/01/same-ioc-across-posts.html",
-        "https://muchdogesec.github.io/fakeblog123///test1/2024/08/23/obstracts-ai-relationships.html",
-        "https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-to-post-1.html",
-        "https://muchdogesec.github.io/fakeblog123///test2/2024/08/07/testing-extractions-1.html",
-        "https://muchdogesec.github.io/fakeblog123///test2/2024/08/05/testing-markdown-elements-1.html",
-        "https://muchdogesec.github.io/fakeblog123///test1/2024/08/01/real-post-example-1.html",
+        (
+            "https://muchdogesec.github.io/fakeblog123///test1/2024/09/01/same-ioc-across-posts.html",
+            datetime(2024, 9, 1, 8, 0, tzinfo=UTC),
+        ),
+        (
+            "https://muchdogesec.github.io/fakeblog123///test1/2024/08/23/obstracts-ai-relationships.html",
+            datetime(2024, 8, 23, 8, 0, tzinfo=UTC),
+        ),
+        (
+            "https://muchdogesec.github.io/fakeblog123///test3/2024/08/20/update-to-post-1.html",
+            datetime(2024, 8, 20, 10, 0, tzinfo=UTC),
+        ),
+        (
+            "https://muchdogesec.github.io/fakeblog123///test2/2024/08/07/testing-extractions-1.html",
+            datetime(2024, 8, 7, 8, 0, tzinfo=UTC),
+        ),
+        (
+            "https://muchdogesec.github.io/fakeblog123///test2/2024/08/05/testing-markdown-elements-1.html",
+            datetime(2024, 8, 5, 8, 0, tzinfo=UTC),
+        ),
+        (
+            "https://muchdogesec.github.io/fakeblog123///test1/2024/08/01/real-post-example-1.html",
+            datetime(2024, 8, 1, 8, 0, tzinfo=UTC),
+        ),
+        (
+            "https://muchdogesec.github.io/fakeblog123///test1/2024/08/01/feed-with-no-published-date.html",
+            datetime(2024, 8, 1, 12, 30, tzinfo=UTC)
+        )
     ]
-
-    assert expected_links == list(posts)
+    links_and_dates = [(k.link, k.pubdate) for k in posts.values()]
+    assert links_and_dates == expected_links
