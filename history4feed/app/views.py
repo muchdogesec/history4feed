@@ -348,7 +348,8 @@ class FeedView(viewsets.ModelViewSet):
         responses={
             201: FeedCreatedJobSerializer,
             400: OpenApiResponse(CommonErrorSerializer, "Bad request", examples=[HTTP400_EXAMPLE]),
-            406: OpenApiResponse(CommonErrorSerializer, "Invalid feed url", examples=[OpenApiExample(name="http-406", value={"detail": "invalid feed url", "code": 406})]),
+            406: OpenApiResponse(CommonErrorSerializer, "Unable to parse feed", examples=[OpenApiExample(name="http-406", value={"detail": "Could not parse feed from url's response", "code": 406})]),
+            422: OpenApiResponse(CommonErrorSerializer, "Unable to fetch feed from url", examples=[OpenApiExample(name="http-422", value={"detail": "Could not fetch feed from url", "code": 422})]),
         },
         request=FeedSerializer,
     )
@@ -373,8 +374,12 @@ class FeedView(viewsets.ModelViewSet):
         else:
             try:
                 feed_data = h4f.parse_feed_from_url(s.data["url"])
+            except h4f.UnknownFeedtypeException as e:
+                raise serializers.InvalidFeed(str(e)) from e
+            except ConnectionError as e:
+                raise serializers.FeedFetchError(f"Unable to fetch feed from url: {e}")
             except Exception as e:
-                raise serializers.InvalidFeed(s.data["url"])
+                raise serializers.FeedFetchError(f"encountered unknown error while fetching/parsing feed from url: {e}")
 
         for k in ['title', 'description']:
             if v := s.validated_data.get(k):
