@@ -116,14 +116,19 @@ class Feed(models.Model):
 class Job(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, help_text="UUID of job")
     state = models.CharField(choices=JobState.choices, max_length=12, default=JobState.PENDING, null=False, help_text="state of the job")
-    run_datetime = models.DateTimeField(auto_now_add=True, editable=False, help_text="time job was executed")
+    run_datetime = models.DateTimeField(auto_now_add=True, editable=False, help_text="time job was executed", db_index=True)
     earliest_item_requested = models.DateTimeField(null=True, help_text="shows the earliest time for posts requested. Useful for when jobs are run to see if the time range it runs across is expected")
     latest_item_requested = models.DateTimeField(null=True, help_text="shows the latest time for posts requested")
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE)
     info = models.CharField(max_length=FEED_DESCRIPTION_MAX_LENGTH, help_text="contains a useful summary of the job (e.g. number of posts retrieved, errors logged)")
     include_remote_blogs = models.BooleanField(default=False)
-    completion_time = models.DateTimeField(default=None, null=True)
+    completion_time = models.DateTimeField(default=None, null=True, db_index=True)
     extra_data = models.JSONField(default=dict, help_text="extra data for the job", blank=True)
+
+    class  Meta:
+        indexes = [
+            models.Index(fields=["feed_id", "id"], name="h4f_job_feed_pk"),
+        ]
 
     def urls(self):
         retval = defaultdict(list)
@@ -197,6 +202,7 @@ class Post(models.Model):
             models.UniqueConstraint(fields=["link", "feed"], name="unique_link_by_feed"),
         ]
         indexes = [
+            models.Index(fields=["feed_id", "id"], name="h4f_feed_pk"),
             models.Index(fields=["pubdate"], condition=models.Q(deleted_manually=False), name="h4f_pubdate_visible"),
             models.Index(fields=["id", "deleted_manually"], name="h4f_deleted_manually_with_pkey"),
             models.Index(fields=["datetime_added"], condition=models.Q(deleted_manually=False), name="h4f_datetime_added"),

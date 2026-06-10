@@ -596,8 +596,8 @@ def test_retrieve_posts_connection_error_successful_after_retry(mock_sleep, mock
         "url": "https://retry.fail",
     }
     mock_add_post.assert_called()
-    assert mock_add_post.call_count == 6
-    assert len(all_posts) == 6
+    assert mock_add_post.call_count == 7
+    assert len(all_posts) == 7
     assert mock_fetch.call_count == 3
     assert mock_sleep.call_count == 2  # called only after the first attempt fails
 
