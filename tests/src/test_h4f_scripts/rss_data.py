@@ -216,7 +216,7 @@ atom_example = """
             rel="alternate" type="text/html"
             title="Real Post Example - Fighting Ursa Luring Targets With Car for Sale" />
         <published>Thu, 01 Aug 2024 08:00:00 +0000</published>
-        <updated>Thu, 01 Aug 2024 08:00:00 +0000</updated>
+        <updated>Thu, 01 Aug 2024 08:09:00 +0000</updated>
         <id>https://muchdogesec.github.io/fakeblog123///test1/2024/08/01/real-post-example-1.html</id>
         <title>
     <![CDATA[ Real Post Example - Fighting Ursa Luring Targets With Car for Sale ]]>
@@ -233,6 +233,34 @@ atom_example = """
         </author>
         <category term="Blog" />
         <category term="Test" />
+    </entry>
+
+    <entry>
+        <link
+            href="https://muchdogesec.github.io/fakeblog123///test1/2024/08/01/feed-with-no-published-date.html"
+            rel="alternate" type="text/html"
+            title="Feed Entry With No Published Date" />
+        <updated>Thu, 01 Aug 2024 12:30:00 +0000</updated>
+        <id>https://muchdogesec.github.io/fakeblog123///test1/2024/08/01/feed-with-no-published-date.html</id>
+        <title>
+    <![CDATA[ Feed Entry With No Published Date ]]>
+        </title>
+        <summary>
+    <![CDATA[ Example feed item intentionally missing a published timestamp for parser testing. ]]>
+        </summary>
+        <content>
+    <![CDATA[
+    This post exists to test how feed consumers handle entries that provide an
+    updated date but omit the published field. The content is intentionally unique
+    to avoid deduplication logic treating it as a copy of another entry.
+    ]]>
+        </content>
+        <author>
+            <name>David G</name>
+            <name>G David</name>
+        </author>
+        <category term="Testing" />
+        <category term="Feed Parsing" />
     </entry>
 </feed>
 """
