@@ -95,18 +95,26 @@ class PostListSerializer(serializers.ListSerializer):
         return instances
 
 class PostSerializer(serializers.ModelSerializer):
-    # categories = serializers.ManyRelatedField()
+    class CategoryListField(serializers.ListField):
+        def to_representation(self, value):
+            if hasattr(value, "all"):
+                value = value.all()
+            return [item.name if hasattr(item, "name") else item for item in value]
+
+    categories = CategoryListField(
+        child=serializers.CharField(max_length=64),
+        max_length=32,
+        required=False,
+    )
+
     class Meta:
         list_serializer_class = PostListSerializer
         model = Post
         exclude = ['feed', 'deleted_manually', 'description']
         read_only_fields = ["id", "datetime_updated", "datetime_added", "is_full_text", "content_type", "added_manually"]
-        
-    
-    def run_validation(self, data=...):
-        if isinstance(data, dict) and isinstance(data.get('categories'), list):
-            data['categories'] = [Category.objects.get_or_create(name=name)[0].name for name in data["categories"]]
-        return super().run_validation(data)
+
+    def validate_categories(self, value):
+        return [Category.objects.get_or_create(name=name)[0].name for name in value]
     
 class PostWithFeedIDSerializer(PostSerializer):
     feed_id = serializers.UUIDField()
