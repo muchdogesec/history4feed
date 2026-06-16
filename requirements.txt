@@ -106,7 +106,7 @@ psycopg2-binary==2.9.10
     #   history4feed (pyproject.toml)
 pycparser==2.22
     # via cffi
-pyjwt==2.10.1
+pyjwt==2.13.0
     # via python-arango
 python-arango==8.2.0
     # via dogesec-commons
