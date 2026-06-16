@@ -731,8 +731,8 @@ class feed_post_view(
         return self.get_queryset().all()
 
     def new_reindex_feed_job(self, feed_id):
-        posts = self.reindex_queryset()
         feed_obj = get_object_or_404(Feed, id=feed_id)
+        posts = sorted(self.reindex_queryset(), key=lambda post: (post.pubdate, post.id))
         job_obj = task_helper.new_patch_posts_job(feed_obj, tuple(posts))
         return job_obj
 
