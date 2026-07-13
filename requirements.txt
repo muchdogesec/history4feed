@@ -114,7 +114,7 @@ python-dateutil==2.9.0.post0
     # via
     #   celery
     #   dateparser
-python-dotenv==1.1.1
+python-dotenv==1.2.2
     # via history4feed (pyproject.toml)
 pytz==2025.2
     # via
@@ -132,7 +132,7 @@ referencing==0.36.2
     #   jsonschema-specifications
 regex==2024.11.6
     # via dateparser
-requests==2.32.4
+requests==2.33.0
     # via
     #   history4feed (pyproject.toml)
     #   python-arango
@@ -162,7 +162,7 @@ tzlocal==5.3.1
     # via dateparser
 uritemplate==4.2.0
     # via drf-spectacular
-urllib3==2.6.3
+urllib3==2.7.0
     # via
     #   python-arango
     #   requests
