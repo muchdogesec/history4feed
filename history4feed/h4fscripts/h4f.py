@@ -23,6 +23,26 @@ from urllib.parse import urljoin
 from celery.exceptions import SoftTimeLimitExceeded
 
 
+PUBDATE_TAGS =  [
+    # --- Publication / Creation Variants (Highest Priority) ---
+    "pubDate",          # Core RSS 2.0 item publication date
+    "published",        # Core Atom item publication date
+    "dcterms:issued",   # Dublin Core formal publication date
+    "dcterms:created",  # Dublin Core explicit resource creation date
+    "creation_date",    # Common custom CMS/database export tag
+    "date",             # Common un-namespaced fallback tag
+
+    # --- Modification / Update Variants (Lowest Priority) ---
+    "updated",          # Core Atom item modification date
+    "dc:date",          # Dublin Core general/modification date
+    "lastBuildDate",    # Core RSS feed/item refresh date
+    "dcterms:modified", # Dublin Core explicit resource modification date
+    "modified_date",    # Common custom database-to-XML export tag
+    "update_date",      # Custom e-commerce and API feed modification tag
+    "a10:updated"       # Microsoft .NET SyndicationFeed framework variant
+]
+
+
 def fetch_page_with_retries(
     url, retry_count=3, sleep_seconds=settings.WAYBACK_SLEEP_SECONDS, **kwargs
 ):
@@ -180,7 +200,7 @@ def parse_feed_from_content(data: bytes, url: str):
 
 
 def get_publish_date(item):
-    for k in ['published', 'pubDate', 'updated']:
+    for k in PUBDATE_TAGS:
         published = getFirstElementByTag(item, k)
         if published:
             break
