@@ -80,6 +80,14 @@ class FatalError(Exception):
     pass
 
 
+def as_bytes(data):
+    if isinstance(data, bytes):
+        return data
+    elif isinstance(data, str):
+        return data.encode("utf-8")
+    else:
+        raise TypeError(f"data must be bytes or str, got {type(data)}")
+
 def fetch_page(
     session, url, headers=None, use_scrapfly_asp=False, **kwargs
 ) -> tuple[bytes, str, str]:
@@ -90,7 +98,7 @@ def fetch_page(
         headers, result = fetch_with_scapfly(
             session, url, headers, proxy_apikey, use_scrapfly_asp
         )
-        return result.content.encode(), result.content_type, result.url
+        return as_bytes(result.content), result.content_type, result.url
 
     logger.info(f"Fetching `{url}`")
     resp: requests.Response = session.get(url, headers=headers)
@@ -136,6 +144,9 @@ def fetch_with_scapfly(session, url, headers, proxy_apikey, use_scrapfly_asp=Fal
         raise FetchRedirect(
             f"PROXY_GET for `{url}` redirected, status: {result.status_code}, reason: {result.status}"
         )
+    if getattr(result, 'format', None) in ["blob", "clob"]:
+        blob_resp = session.get(result.content, params=dict(key=proxy_apikey))
+        result.content = blob_resp.content
     return headers, result
 
 
@@ -195,8 +206,9 @@ def parse_feed_from_content(data: bytes, url: str):
             raise UnknownFeedtypeException("feed is neither RSS or ATOM")
         feed_data["url"] = url
         return feed_data
-    except BaseException as e:
-        raise UnknownFeedtypeException(f"Failed to parse feed from `{url}`") from e
+    except Exception as e:
+        logger.error(f"Failed to parse feed from `{url}`: {e}", exc_info=True)
+        raise UnknownFeedtypeException(f"Failed to parse feed from `{url}`: {e}") from e
 
 
 def get_publish_date(item):

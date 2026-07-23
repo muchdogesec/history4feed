@@ -110,19 +110,20 @@ def test_fetch_page_success(mock_logger, dummy_url):
     assert content_type == "text/html"
     assert final_url == dummy_url
 
-
+@pytest.mark.parametrize("content", [b"<html>content</html>", "<html>content</html>"])
 @patch("history4feed.h4fscripts.h4f.fetch_with_scapfly")
-def test_fetch_page_uses_scrapfly(mock_fetch, settings, dummy_url):
+def test_fetch_page_uses_scrapfly(mock_fetch, settings, dummy_url, content):
     api_key = "some value"
     session = MagicMock()
     settings.HISTORY4FEED_SETTINGS = {"SCRAPFLY_APIKEY": api_key}
     use_asp = MagicMock()
     mocked_resp = MagicMock()
+    mocked_resp.content = content
     mock_fetch.return_value = [None, mocked_resp]
     result = fetch_page(session, dummy_url, use_scrapfly_asp=use_asp)
     mock_fetch.assert_called_once_with(session, dummy_url, {}, api_key, use_asp)
     assert result == (
-        mocked_resp.content.encode(),
+        b"<html>content</html>",
         mocked_resp.content_type,
         mocked_resp.url,
     )
