@@ -101,3 +101,19 @@ def test_job__has_failures(jobs):
     assert job.has_failures is False
     job.extra_data['feed_urls'][0]['state'] = "failed"
     assert job.has_failures is True
+
+
+@pytest.mark.django_db
+def test_fulltextjob_save_truncates_long_error_str(jobs):
+    job = jobs[0]
+    long_error = "x" * 1600
+
+    ftj = models.FulltextJob.objects.create(
+        job=job,
+        status=models.FullTextState.FAILED,
+        error_str=long_error,
+        link="http://example.co/1",
+    )
+
+    assert len(ftj.error_str) == 1500
+    assert ftj.error_str == long_error[:1500]

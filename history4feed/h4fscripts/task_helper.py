@@ -337,6 +337,7 @@ def add_post_to_db(db_feed: models.Feed, job: models.Job, post_dict: h4f.PostDic
 def retrieve_full_text(ftjob_pk):
     fulltext_job = models.FulltextJob.objects.get(pk=ftjob_pk)
     use_scrapfly_asp = fulltext_job.job.extra_data["use_scrapfly_asp"]
+    should_save_post = False
     try:
         if fulltext_job.is_cancelled():
             raise JobCancelled()
@@ -346,9 +347,10 @@ def retrieve_full_text(ftjob_pk):
                     fulltext_job.post.link, use_scrapfly_asp=use_scrapfly_asp
                 )
             )
+            fulltext_job.post.is_full_text = True
             fulltext_job.status = models.FullTextState.RETRIEVED
             fulltext_job.error_str = ""
-            fulltext_job.post.is_full_text = True
+            should_save_post = True
     except JobCancelled:
         fulltext_job.status = models.FullTextState.CANCELLED
         fulltext_job.error_str = "job cancelled while retrieving fulltext"
@@ -359,8 +361,16 @@ def retrieve_full_text(ftjob_pk):
     except BaseException as e:
         fulltext_job.error_str = str(e)
         fulltext_job.status = models.FullTextState.FAILED
-    fulltext_job.save()
-    fulltext_job.post.save()
+
+    try:
+        if should_save_post:
+            fulltext_job.post.save()
+    except BaseException as e:
+        fulltext_job.error_str = f"Error saving fulltext: {e}"
+        fulltext_job.status = models.FullTextState.FAILED
+        logger.error(e, exc_info=True)
+    finally:
+        fulltext_job.save()
 
 
 from celery import signals

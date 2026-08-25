@@ -660,7 +660,7 @@ def test_retrieve_full_text_cancelled(mock_get_job, dummy_ftjob):
     assert dummy_ftjob.status == FullTextState.CANCELLED
     assert "cancelled" in dummy_ftjob.error_str.lower()
     dummy_ftjob.save.assert_called_once()
-    dummy_ftjob.post.save.assert_called_once()
+    dummy_ftjob.post.save.assert_not_called()
 
 
 @patch("history4feed.h4fscripts.task_helper.h4f.get_full_text", side_effect=Exception("boom"))
@@ -674,7 +674,30 @@ def test_retrieve_full_text_exception(mock_get_job, mock_get_text, dummy_ftjob):
     assert dummy_ftjob.status == FullTextState.FAILED
     assert dummy_ftjob.error_str == "boom"
     dummy_ftjob.save.assert_called_once()
+    dummy_ftjob.post.save.assert_not_called()
+
+
+@patch("history4feed.h4fscripts.task_helper.logger")
+@patch(
+    "history4feed.h4fscripts.task_helper.h4f.get_full_text",
+    return_value=("<p>Content</p>", "text/html"),
+)
+@patch("history4feed.h4fscripts.task_helper.models.FulltextJob.objects.get")
+def test_retrieve_full_text_post_save_exception(
+    mock_get_job, mock_get_text, mock_logger, dummy_ftjob
+):
+    mock_get_job.return_value = dummy_ftjob
+    dummy_ftjob.is_cancelled.return_value = False
+    dummy_ftjob.post.save.side_effect = Exception("db write failed")
+    dummy_ftjob.job.extra_data = {"use_scrapfly_asp": False}
+
+    retrieve_full_text(dummy_ftjob.pk)
+
+    assert dummy_ftjob.status == FullTextState.FAILED
+    assert dummy_ftjob.error_str == "Error saving fulltext: db write failed"
+    dummy_ftjob.save.assert_called_once()
     dummy_ftjob.post.save.assert_called_once()
+    mock_logger.error.assert_called_once()
 
 
 @patch("history4feed.h4fscripts.task_helper.h4f.get_full_text")
@@ -691,7 +714,7 @@ def test_retrieve_full_text_soft_timeout(mock_get_job, mock_get_text, dummy_ftjo
     assert "timed out" in dummy_ftjob.error_str.lower()
     assert "SoftTimeLimitExceeded" in dummy_ftjob.error_str
     dummy_ftjob.save.assert_called_once()
-    dummy_ftjob.post.save.assert_called_once()
+    dummy_ftjob.post.save.assert_not_called()
 
 
 @patch("history4feed.h4fscripts.task_helper.h4f.get_full_text")
@@ -708,7 +731,7 @@ def test_retrieve_full_text_hard_timeout(mock_get_job, mock_get_text, dummy_ftjo
     assert "timed out" in dummy_ftjob.error_str.lower()
     assert "TimeLimitExceeded" in dummy_ftjob.error_str
     dummy_ftjob.save.assert_called_once()
-    dummy_ftjob.post.save.assert_called_once()
+    dummy_ftjob.post.save.assert_not_called()
 
 @pytest.mark.django_db
 def test_add_post_to_db__logs_failure(jobs):

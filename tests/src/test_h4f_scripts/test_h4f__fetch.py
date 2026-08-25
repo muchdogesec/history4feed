@@ -40,6 +40,28 @@ def test_fetch_page_with_retries_success(
     mock_sleep.assert_not_called()
 
 
+@patch("history4feed.h4fscripts.h4f.requests.Session")
+@patch("history4feed.h4fscripts.h4f.fetch_page")
+@patch("history4feed.h4fscripts.h4f.fake_useragent.UserAgent")
+def test_fetch_page_with_retries_sets_headers_and_max_redirects(
+    mock_ua, mock_fetch_page, mock_session_cls, dummy_url
+):
+    mock_ua().random = "test-agent"
+    session = MagicMock()
+    mock_session_cls.return_value = session
+    mock_fetch_page.return_value = (b"ok", "text/html", dummy_url)
+
+    result = fetch_page_with_retries(dummy_url, headers={"Accept": "application/xml"})
+
+    assert result == (b"ok", "text/html", dummy_url)
+    assert session.max_redirects == 3
+    mock_fetch_page.assert_called_once_with(
+        session,
+        dummy_url,
+        headers={"Accept": "application/xml", "User-Agent": "test-agent"},
+    )
+
+
 @patch("history4feed.h4fscripts.h4f.time.sleep", return_value=None)
 @patch("history4feed.h4fscripts.h4f.fetch_page")
 @patch("history4feed.h4fscripts.h4f.fake_useragent.UserAgent")
@@ -109,6 +131,26 @@ def test_fetch_page_success(mock_logger, dummy_url):
     assert content == b"html-content"
     assert content_type == "text/html"
     assert final_url == dummy_url
+
+
+@patch("history4feed.h4fscripts.h4f.logger")
+@patch("history4feed.h4fscripts.h4f.brotli.decompress", return_value=b"decompressed")
+def test_fetch_page_brotli_success(mock_brotli, mock_logger, dummy_url):
+    session = MagicMock()
+    response = MagicMock(spec=Response)
+    response.ok = True
+    response.content = b"compressed"
+    response.headers = {"content-type": "text/html"}
+    response.url = dummy_url
+    session.get.return_value = response
+
+    content, content_type, final_url = fetch_page(session, dummy_url)
+
+    mock_brotli.assert_called_once_with(b"compressed")
+    assert content == b"decompressed"
+    assert content_type == "text/html"
+    assert final_url == dummy_url
+
 
 @pytest.mark.parametrize("content", [b"<html>content</html>", "<html>content</html>"])
 @patch("history4feed.h4fscripts.h4f.fetch_with_scapfly")
@@ -245,6 +287,27 @@ def test_fetch_with_scapfly_500_error(dummy_url):
         str(exp.value)
         == "Got server error 500 from `https://example.com/test`, stopping"
     )
+
+
+def test_fetch_with_scapfly_404_error(dummy_url):
+    session = MagicMock()
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {
+        "result": {
+            "status_code": 404,
+            "status": "DONE",
+            "content": "",
+            "url": dummy_url,
+            "content_type": "text/html",
+        }
+    }
+    session.get.return_value = response
+
+    with pytest.raises(history4feedException) as exc:
+        fetch_with_scapfly(session, dummy_url, {"User-Agent": "UA"}, "apikey")
+
+    assert "status: 404" in str(exc.value)
 
 
 def test_fetch_with_scapfly_redirect(dummy_url):
