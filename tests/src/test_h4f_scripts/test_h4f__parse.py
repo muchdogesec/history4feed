@@ -148,7 +148,10 @@ def test_get_publish_date_adds_utc_when_missing_timezone():
 @pytest.mark.parametrize(
     ("xml", "expected_author"),
     [
-        ("<item><dc:creator>Author A</dc:creator></item>", "Author A"),
+        (
+            '<item xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Author A</dc:creator></item>',
+            "Author A",
+        ),
         ("<item><author><name>Author B</name></author></item>", "Author B"),
         ("<item><author>Author C</author></item>", "Author C"),
     ],

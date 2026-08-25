@@ -59,7 +59,9 @@ def test_class_variables():
 @pytest.mark.django_db
 def test_create_feed(client, api_schema):
 
-    feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
+    feed = Feed.objects.create(
+        url="https://example.com/rss.xml", title="Test Feed", feed_type=FeedType.RSS
+    )
     job = Job.objects.create(feed=feed)
     payload = dict(data="some data")
     with patch.object(FeedView, "new_create_job") as mock_create_job:
@@ -205,7 +207,9 @@ def test_feed_metadata_update(client, feed, api_schema, payload):
 
 @pytest.mark.django_db
 def test_fetch_feed(client, api_schema):
-    feed = Feed.objects.create(url="https://example.com/rss.xml", title="Test Feed")
+    feed = Feed.objects.create(
+        url="https://example.com/rss.xml", title="Test Feed", feed_type=FeedType.RSS
+    )
     job = Job.objects.create(feed=feed)
     with patch.object(FeedView, "new_fetch_job") as mock_fetch_job:
         mock_fetch_job.return_value = job
