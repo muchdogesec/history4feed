@@ -246,3 +246,12 @@ class FulltextJob(models.Model):
         
     def is_cancelled(self):
         return self.job.state == JobState.CANCELLED
+
+    def save(self, *args, **kwargs):
+        if self.error_str and len(self.error_str) > 1500:
+            logging.warning("truncating fulltext error_str to 1500 characters")
+            self.error_str = self.error_str[:1500]
+        if self.link and len(self.link) > 1500:
+            logging.warning("truncating fulltext link to 1500 characters")
+            self.link = self.link[:1500]
+        return super().save(*args, **kwargs)

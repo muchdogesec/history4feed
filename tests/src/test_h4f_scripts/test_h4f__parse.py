@@ -1,11 +1,17 @@
 import pytest
 from history4feed.h4fscripts.h4f import (
+    get_author,
+    get_categories,
+    get_publish_date,
+    parse_atom_description,
     parse_feed_from_content,
     parse_posts_from_atom_feed,
     parse_posts_from_rss_feed,
 )
+from history4feed.h4fscripts.exceptions import UnknownFeedtypeException
 from .rss_data import rss_example, atom_example
 from datetime import datetime, UTC
+from xml.dom.minidom import parseString
 
 @pytest.mark.parametrize(
     ["data", "url", "expected_feed_data"],
@@ -38,6 +44,22 @@ def test_parse_feed_from_content(data, url, expected_feed_data):
     for k, v in expected_feed_data.items():
         if v:
             assert feed_data[k] == v
+
+
+def test_parse_feed_from_content_accepts_string_input():
+    feed_data = parse_feed_from_content(rss_example, "https://some_url.net/")
+
+    assert feed_data["title"] == "Your awesome title"
+    assert feed_data["feed_type"] == "rss"
+
+
+def test_parse_feed_from_content_invalid_xml_raises():
+    with pytest.raises(UnknownFeedtypeException) as exc:
+        parse_feed_from_content(
+            b"<html><body>not a feed</body></html>", "https://some_url.net/"
+        )
+
+    assert "Failed to parse feed from `https://some_url.net/`" in str(exc.value)
 
 
 def test_parse_posts_from_rss_feed():
@@ -107,3 +129,63 @@ def test_parse_posts_from_atom_feed():
     ]
     links_and_dates = [(k.link, k.pubdate) for k in posts.values()]
     assert links_and_dates == expected_links
+
+
+def test_get_publish_date_adds_utc_when_missing_timezone():
+    item = parseString(
+        """
+        <item>
+            <pubDate>2024-08-01T12:34:56</pubDate>
+        </item>
+        """
+    ).documentElement
+
+    publish_date = get_publish_date(item)
+
+    assert publish_date == datetime(2024, 8, 1, 12, 34, 56, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("xml", "expected_author"),
+    [
+        (
+            '<item xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Author A</dc:creator></item>',
+            "Author A",
+        ),
+        ("<item><author><name>Author B</name></author></item>", "Author B"),
+        ("<item><author>Author C</author></item>", "Author C"),
+    ],
+)
+def test_get_author_fallbacks(xml, expected_author):
+    item = parseString(xml).documentElement
+
+    assert get_author(item) == expected_author
+
+
+def test_get_categories_reads_term_and_text_values():
+    entry = parseString(
+        """
+        <entry>
+            <category term="alpha" />
+            <category>beta</category>
+        </entry>
+        """
+    ).documentElement
+
+    assert get_categories(entry) == ["alpha", "beta"]
+
+
+def test_parse_atom_description_prefers_content_over_summary():
+    entry = parseString(
+        """
+        <entry>
+            <summary>Summary only</summary>
+            <content>Full content</content>
+        </entry>
+        """
+    ).documentElement
+
+    description, content_type = parse_atom_description(entry)
+
+    assert description == "Full content"
+    assert content_type is None
