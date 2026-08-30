@@ -2,7 +2,7 @@ name: Run Tests
 
 permissions:
   contents: read
-  
+
 on:
   push:
     branches:
@@ -15,7 +15,7 @@ jobs:
   test-pipeline:
     runs-on: ubuntu-latest
     environment: test_pipeline
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
       - name: Wait for container to start
         id: wait_for_container_to_start
         run: sleep 10
-   
+
       - name: Setup environment
         id: setup_environment
         run: |
@@ -86,3 +86,19 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: schemathesis.junit.xml
           flags: schemathesis
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up Docker image ID
+        run: echo "IMAGE_ID=ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Build Docker image
+        run: |
+          TAGS="--tag $IMAGE_ID:latest --tag $IMAGE_ID:${{ github.sha }}"
+
+          docker buildx build . \
+            --file Dockerfile \
+          --platform linux/amd64,linux/arm64 \
+            $TAGS \
+            --build-arg REPO_URL="https://github.com/${{ github.repository }}"
