@@ -54,7 +54,7 @@ django-filter==25.1
     # via
     #   dogesec-commons
     #   history4feed (pyproject.toml)
-djangorestframework==3.16.0
+djangorestframework==3.17.2
     # via
     #   dogesec-commons
     #   drf-spectacular
